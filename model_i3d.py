@@ -9,6 +9,8 @@ import torch.nn.functional as F
 import torchvision.models as models
 from torchvision import transforms
 
+from pyramidpooling import SpatialPyramidPooling
+
 
 def conv3x3x3(in_planes, out_planes, stride=1):
     """3x3x3 convolution with padding."""
@@ -171,18 +173,28 @@ class ResNet3D(nn.Module):
         return x
 
 
-class FC(nn.Module):
+class MiniFC(nn.Module):
 
-    def __init__(self, hps, input_dim, output_dim):
-        super(FC, self).__init__()
-        conv_size = hps['conv_size']
-        self.conv31 = nn.Conv3d(1024, conv_size, kernel_size=1, stride=1)
+    def __init__(self, hparams):
+        super(MiniFC, self).__init__()
 
-        self.fc = build_fc(hps, input_dim, output_dim)
+        self.conv31 = nn.Sequential(nn.Conv3d(1024, hparams['conv_size'], kernel_size=1, stride=1),
+                                    nn.BatchNorm3d(hparams['conv_size']),
+                                    nn.ReLU())
+        # input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
+        #             int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
+        # input_dim = hparams['conv_size']
+        # self.avgpool = nn.AdaptiveAvgPool3d(1)
+        levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
+        self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
+        input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
+
+        self.fc = build_fc(hparams, input_dim, hparams['output_size'])
 
     def forward(self, x):
         x3 = x
         x3 = self.conv31(x3)
+        x3 = self.pyramidpool(x3)
 
         x = torch.cat([
             x3.reshape(x3.shape[0], -1),
@@ -209,6 +221,8 @@ def build_fc(p, input_dim, output_dim):
         else:
             in_size, out_size = p.get(f"layer_hidden"), p.get(f"layer_hidden")
         module_list.append(nn.Linear(in_size, out_size))
+        if p.get('fc_batch_norm'):
+            module_list.append(nn.BatchNorm1d(out_size))
         module_list.append(activations[p.get('activation')])
         module_list.append(nn.Dropout(p.get("dropout_rate")))
 
@@ -219,6 +233,7 @@ def build_fc(p, input_dim, output_dim):
     module_list.append(nn.Linear(out_size, output_dim))
 
     return nn.Sequential(*module_list)
+
 
 def modify_resnets(model):
     # Modify attributs

@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import kornia as K
 import pytorch_lightning as pl
 from adabelief_pytorch import AdaBelief
-from pytorch_lightning.callbacks import BackboneFinetuning
+from pytorch_lightning.callbacks import BackboneFinetuning, ModelCheckpoint, EarlyStopping
 from pytorch_lightning.core.lightning import LightningModule
 from pytorch_lightning.plugins import DDPPlugin
 from torch import Tensor
@@ -100,7 +100,7 @@ class LitI3DFC(LightningModule):
         # self.hparams = hparams
         self.lr = self.hparams.learning_rate
 
-        self.automatic_optimization = False if self.hparams.asm else True
+        self.automatic_optimization = False
 
         # self.train_transform = DataAugmentation()
         self.train_transform = None
@@ -109,16 +109,7 @@ class LitI3DFC(LightningModule):
 
         # self.backbone = nn.SyncBatchNorm.convert_sync_batchnorm(backbone) # slooooow
 
-        self.conv31 = nn.Conv3d(1024, hparams['conv_size'], kernel_size=1, stride=1)
-        # input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
-        #             int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
-        # input_dim = hparams['conv_size']
-        # self.avgpool = nn.AdaptiveAvgPool3d(1)
-        levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
-        self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
-        input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
-
-        self.fc = build_fc(hparams, input_dim, hparams['output_size'])
+        self.minifc = MiniFC(hparams)
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -133,14 +124,12 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--backbone_lr_ratio', type=float, default=0.1)
         parser.add_argument('--pooling_mode', type=str, default='avg')
         parser.add_argument('--softpool', default=False, action="store_true")
+        parser.add_argument('--fc_batch_norm', default=False, action="store_true")
         return parser
 
     def forward(self, x):
         x3 = self.backbone(x)
-        x3 = self.conv31(x3)
-        # x3 = self.avgpool(x3)
-        x3 = self.pyramidpool(x3)
-        out = self.fc(x3.reshape(x3.shape[0], -1))
+        out = self.minifc(x3)
         return out
 
     def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
@@ -203,7 +192,7 @@ class LitI3DFC(LightningModule):
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
-        no_decay = ["bias", "BatchNorm3D.weight"]
+        no_decay = ["bias", "BatchNorm3D.weight", "BatchNorm1D.weight", "BatchNorm2D.weight"]
         optimizer_grouped_parameters = [
             {
                 "params": [p for n, p in self.backbone.named_parameters() if not any(nd in n for nd in no_decay)],
@@ -216,22 +205,12 @@ class LitI3DFC(LightningModule):
                 'lr': self.hparams.learning_rate * self.hparams.backbone_lr_ratio,
             },
             {
-                "params": [p for n, p in self.conv31.named_parameters() if not any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.minifc.named_parameters() if not any(nd in n for nd in no_decay)],
                 "weight_decay": self.hparams.weight_decay,
                 'lr': self.hparams.learning_rate,
             },
             {
-                "params": [p for n, p in self.conv31.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-                'lr': self.hparams.learning_rate,
-            },
-            {
-                "params": [p for n, p in self.fc.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": self.hparams.weight_decay,
-                'lr': self.hparams.learning_rate,
-            },
-            {
-                "params": [p for n, p in self.fc.named_parameters() if any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.minifc.named_parameters() if any(nd in n for nd in no_decay)],
                 "weight_decay": 0.0,
                 'lr': self.hparams.learning_rate,
             },
@@ -276,6 +255,8 @@ if __name__ == '__main__':
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--asm", default=False, action="store_true")
+    parser.add_argument('--predictions_dir', type=str, default='./predictions/v1/')
+
 
     parser = LitI3DFC.add_model_specific_args(parser)
     args = parser.parse_args()
@@ -287,18 +268,36 @@ if __name__ == '__main__':
     dm.setup()
     hparams['output_size'] = dm.num_voxels
 
+    checkpoint_callback = ModelCheckpoint(
+        monitor='val_corr',
+        dirpath='/home/huze/.cache/checkpoints',
+        filename='MiniFC-{epoch:02d}-{val_corr:.6f}',
+        save_top_k=3,
+        mode='max',
+    )
+
+    early_stop_callback = EarlyStopping(
+        monitor='val_corr',
+        min_delta=0.00,
+        patience=3,
+        verbose=False,
+        mode='max'
+    )
+
     trainer = pl.Trainer(
         precision=16 if args.fp16 else 32,
         gpus=args.gpus,
         # accelerator='ddp',
-        plugins=DDPPlugin(find_unused_parameters=False),
-        # limit_train_batches=0.1,
+        # plugins=DDPPlugin(find_unused_parameters=False),
+        # limit_train_batches=0.2,
         # limit_val_batches=0.2,
         # limit_test_batches=0.3,
         max_epochs=args.max_epochs,
         checkpoint_callback=args.save_checkpoints,
         val_check_interval=args.val_check_interval,
-        callbacks=[BackboneFinetuning(args.backbone_freeze_epochs)],
+        callbacks=[BackboneFinetuning(args.backbone_freeze_epochs),
+                   checkpoint_callback,
+                   early_stop_callback],
         # auto_lr_find=True,
     )
 
@@ -309,4 +308,7 @@ if __name__ == '__main__':
     # trainer.tune(plmodel, datamodule=dm)
     trainer.fit(plmodel, dm)
 
-    pass
+    plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
+    prediction = trainer.predict(plmodel, datamodule=dm)
+
+    torch.save(prediction, os.path.join(args.predictions_dir, f'{args.roi}.pt'))

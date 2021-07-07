@@ -181,7 +181,7 @@ class AlgonautsMINIDataModule(pl.LightningDataModule):
         return DataLoader(self.val_dataset, batch_size=self.batch_size,
                           shuffle=False, num_workers=8, pin_memory=False)
 
-    def test_dataloader(self):
+    def predict_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size,
                           shuffle=False, num_workers=8, pin_memory=False)
 
