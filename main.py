@@ -1,33 +1,18 @@
 from argparse import ArgumentParser
 
-import torch
-from adabelief_pytorch import AdaBelief
-from pytorch_lightning import LightningDataModule
-from pytorch_lightning.plugins import DDPPlugin, DataParallelPlugin
-from torch.nn import functional as F
-from torch import nn
-from pytorch_lightning.core.lightning import LightningModule
-from torch.optim import SGD
-from typing import List, Optional
+import kornia as K
 import pytorch_lightning as pl
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
-from torchmetrics import MeanSquaredError
+from adabelief_pytorch import AdaBelief
+from pytorch_lightning.callbacks import BackboneFinetuning
+from pytorch_lightning.core.lightning import LightningModule
+from pytorch_lightning.plugins import DDPPlugin
+from torch import Tensor
 
 from dataloading import AlgonautsMINIDataModule
-from pytorch_lightning.callbacks import BackboneFinetuning
 from model_i3d import *
+from sam import SAM
 from utils import *
-import kornia as K
-
-from torchmetrics.regression import PearsonCorrcoef
-
-from torchmetrics.utilities.checks import _check_same_shape
-from torchmetrics.utilities.data import dim_zero_cat
-from torchmetrics.metric import Metric
-from torch import Tensor
-from typing import Any, Optional
-from typing import Tuple
+from pyramidpooling import *
 
 
 # from torchmetrics.utilities import rank_zero_warn
@@ -86,70 +71,6 @@ def vectorized_correlation(x, y):
     return corr.ravel()
 
 
-#
-# class MulPearsonCorrcoef(Metric):
-#     r"""
-#     Forward accepts
-#
-#     - ``preds`` (float tensor): ``(B, N,)``
-#     - ``target``(float tensor): ``(B, N,)``
-#
-#     Args:
-#         compute_on_step:
-#             Forward only calls ``update()`` and return None if this is set to False. default: True
-#         dist_sync_on_step:
-#             Synchronize metric state across processes at each ``forward()``
-#             before returning the value at the step. default: False
-#         process_group:
-#             Specify the process group on which synchronization is called. default: None (which selects the entire world)
-#
-#     """
-#
-#     def __init__(
-#         self,
-#         compute_on_step: bool = False,
-#         dist_sync_on_step: bool = False,
-#         process_group: Optional[Any] = None,
-#     ) -> None:
-#         super().__init__(
-#             compute_on_step=compute_on_step,
-#             dist_sync_on_step=dist_sync_on_step,
-#             process_group=process_group,
-#         )
-#
-#         rank_zero_warn(
-#             'Metric `MulPearsonCorrcoef` will save all targets and predictions in buffer.'
-#             ' For large datasets this may lead to large memory footprint.'
-#         )
-#
-#         self.add_state("preds", default=[], dist_reduce_fx="cat")
-#         self.add_state("target", default=[], dist_reduce_fx="cat")
-#
-#     def update(self, preds: Tensor, target: Tensor) -> None:
-#         """
-#         Update state with predictions and targets.
-#
-#         Args:
-#             preds: Predictions from model
-#             target: Ground truth values
-#         """
-#         preds, target = _pearson_corrcoef_update(preds, target)
-#         self.preds.append(preds)
-#         self.target.append(target)
-#
-#     def compute(self) -> Tensor:
-#         """
-#         Computes pearson correlation coefficient over state.
-#         """
-#         preds = dim_zero_cat(self.preds)
-#         target = dim_zero_cat(self.target)
-#         return _pearson_corrcoef_compute(preds, target)
-#
-#     @property
-#     def is_differentiable(self) -> bool:
-#         return False
-
-
 class DataAugmentation(nn.Module):
     """Module to perform data augmentation using Kornia on torch tensors."""
 
@@ -176,17 +97,28 @@ class LitI3DFC(LightningModule):
     def __init__(self, backbone, hparams: dict, *args, **kwargs):
         super(LitI3DFC, self).__init__()
         self.save_hyperparameters(hparams)
+        # self.hparams = hparams
         self.lr = self.hparams.learning_rate
 
+        self.automatic_optimization = False if self.hparams.asm else True
+
         # self.train_transform = DataAugmentation()
+        self.train_transform = None
 
         self.backbone = backbone
-        self.conv31 = nn.Conv3d(1024, hparams['conv_size'], kernel_size=1, stride=1)
-        input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
-                    int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
-        self.fc = build_fc(hparams, input_dim, hparams['output_size'])
 
-        # self.val_corr = MeanSquaredError(compute_on_step=False)
+        # self.backbone = nn.SyncBatchNorm.convert_sync_batchnorm(backbone) # slooooow
+
+        self.conv31 = nn.Conv3d(1024, hparams['conv_size'], kernel_size=1, stride=1)
+        # input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
+        #             int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
+        # input_dim = hparams['conv_size']
+        # self.avgpool = nn.AdaptiveAvgPool3d(1)
+        levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
+        self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
+        input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
+
+        self.fc = build_fc(hparams, input_dim, hparams['output_size'])
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -196,31 +128,62 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--activation', type=str, default='elu')
         parser.add_argument('--layer_hidden', type=int, default=2048)
         parser.add_argument('--dropout_rate', type=float, default=0.0)
-        parser.add_argument('--weight_decay', type=float, default=1e-4)
-        parser.add_argument('--learning_rate', type=float, default=1e-2)
+        parser.add_argument('--weight_decay', type=float, default=1e-2)
+        parser.add_argument('--learning_rate', type=float, default=3e-4)
+        parser.add_argument('--backbone_lr_ratio', type=float, default=0.1)
+        parser.add_argument('--pooling_mode', type=str, default='avg')
+        parser.add_argument('--softpool', default=False, action="store_true")
         return parser
 
     def forward(self, x):
         x3 = self.backbone(x)
         x3 = self.conv31(x3)
+        # x3 = self.avgpool(x3)
+        x3 = self.pyramidpool(x3)
         out = self.fc(x3.reshape(x3.shape[0], -1))
         return out
 
-    def _shared_train_val(self, batch, batch_idx, prefix):
+    def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
         x, y = batch
         out = self(x)
         loss = F.mse_loss(out, y)
-        self.log(f'{prefix}_mse_loss', loss,
-                 on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        if is_log:
+            self.log(f'{prefix}_mse_loss', loss,
+                     on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         return out, loss
 
+    # def training_step(self, batch, batch_idx):
+    #     x, y = batch
+    #     # x = self.train_transform(x)
+    #     batch = (x, y)
+    #
+    #     out, loss = self._shared_train_val(batch, batch_idx, 'train')
+    #     return loss
+
     def training_step(self, batch, batch_idx):
-        # x, y = batch
-        # x = self.train_transform(x)
-        # batch = (x, y)
+        self.train()
+        x, y = batch
+        x = self.train_transform(x) if self.train_transform is not None else x
+        batch = (x, y)
+
+        optimizer = self.optimizers()
 
         out, loss = self._shared_train_val(batch, batch_idx, 'train')
-        return loss
+        self.manual_backward(loss)  # take care fp16
+
+        if self.hparams.asm:
+            def disable_bn(model):
+                for module in model.modules():
+                    if isinstance(module, nn.BatchNorm3d):
+                        module.eval()
+
+            optimizer.first_step(zero_grad=True)
+            self.backbone.apply(disable_bn)
+            out, loss = self._shared_train_val(batch, batch_idx, 'train', is_log=False)
+            self.manual_backward(loss)  # take care fp16
+            optimizer.second_step(zero_grad=True)
+        else:
+            optimizer.step()
 
     def validation_step(self, batch, batch_idx):
         out, loss = self._shared_train_val(batch, batch_idx, 'val')
@@ -243,14 +206,37 @@ class LitI3DFC(LightningModule):
         no_decay = ["bias", "BatchNorm3D.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.backbone.named_parameters() if not any(nd in n for nd in no_decay)],
                 "weight_decay": self.hparams.weight_decay,
+                'lr': self.hparams.learning_rate * self.hparams.backbone_lr_ratio,
             },
             {
-                "params": [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.backbone.named_parameters() if any(nd in n for nd in no_decay)],
                 "weight_decay": 0.0,
+                'lr': self.hparams.learning_rate * self.hparams.backbone_lr_ratio,
+            },
+            {
+                "params": [p for n, p in self.conv31.named_parameters() if not any(nd in n for nd in no_decay)],
+                "weight_decay": self.hparams.weight_decay,
+                'lr': self.hparams.learning_rate,
+            },
+            {
+                "params": [p for n, p in self.conv31.named_parameters() if any(nd in n for nd in no_decay)],
+                "weight_decay": 0.0,
+                'lr': self.hparams.learning_rate,
+            },
+            {
+                "params": [p for n, p in self.fc.named_parameters() if not any(nd in n for nd in no_decay)],
+                "weight_decay": self.hparams.weight_decay,
+                'lr': self.hparams.learning_rate,
+            },
+            {
+                "params": [p for n, p in self.fc.named_parameters() if any(nd in n for nd in no_decay)],
+                "weight_decay": 0.0,
+                'lr': self.hparams.learning_rate,
             },
         ]
+        # optimizer_grouped_parameters = filter(lambda p: p.requires_grad, self.parameters())
         # optimizer_grouped_parameters = [
         #     {
         #         "params": [p for p in self.backbone.parameters()],
@@ -265,45 +251,53 @@ class LitI3DFC(LightningModule):
         #         "lr": 3e-4,
         #     },
         # ]
-        # optimizer = AdaBelief(optimizer_grouped_parameters, lr=self.hparams.learning_rate)
-        optimizer = SGD(optimizer_grouped_parameters, lr=self.lr, momentum=0.9)
-        sch = CosineAnnealingLR(optimizer, self.hparams.max_epochs)
+        if not self.hparams.asm:
+            optimizer = AdaBelief(optimizer_grouped_parameters)
+            # optimizer = SGD(optimizer_grouped_parameters, lr=self.lr, momentum=0.9, weight_decay=self.hparams.weight_decay)
+            # sch = CosineAnnealingLR(optimizer, self.hparams.max_epochs)
+        else:
+            optimizer = SAM(optimizer_grouped_parameters, AdaBelief, adaptive=True, rho=0.5)
 
-        return [optimizer], [sch]
+        return [optimizer], []
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--video_frames', type=int, default=16)
     parser.add_argument('--video_size', type=int, default=288)
-    parser.add_argument('--batch_size', type=int, default=25)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--max_epochs', type=int, default=300)
+    parser.add_argument('--datasets_dir', type=str, default='./datasets/')
+    parser.add_argument('--roi', type=str, default="EBA")
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
-    parser.add_argument('--gpus', type=str, default='-1')
-    parser.add_argument('--cached', type=bool, default=True)  #fix this
+    parser.add_argument('--gpus', type=str, default='1')
+    parser.add_argument('--val_check_interval', type=float, default=1.0)
+    parser.add_argument('--save_checkpoints', default=False, action="store_true")
+    parser.add_argument('--cached', default=False, action="store_true")
+    parser.add_argument("--fp16", default=False, action="store_true")
+    parser.add_argument("--asm", default=False, action="store_true")
 
     parser = LitI3DFC.add_model_specific_args(parser)
     args = parser.parse_args()
     hparams = vars(args)
 
-    dm = AlgonautsMINIDataModule(batch_size=args.batch_size, datasets_dir='datasets/',
+    dm = AlgonautsMINIDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, roi=args.roi,
                                  num_frames=hparams['video_frames'], resolution=hparams['video_size'],
                                  cached=args.cached)
     dm.setup()
     hparams['output_size'] = dm.num_voxels
 
     trainer = pl.Trainer(
-        precision=16,
+        precision=16 if args.fp16 else 32,
         gpus=args.gpus,
         # accelerator='ddp',
         plugins=DDPPlugin(find_unused_parameters=False),
-        # plugins=DataParallelPlugin([0,1]),
         # limit_train_batches=0.1,
         # limit_val_batches=0.2,
         # limit_test_batches=0.3,
         max_epochs=args.max_epochs,
-        checkpoint_callback=False,
-        val_check_interval=1.0,
+        checkpoint_callback=args.save_checkpoints,
+        val_check_interval=args.val_check_interval,
         callbacks=[BackboneFinetuning(args.backbone_freeze_epochs)],
         # auto_lr_find=True,
     )
