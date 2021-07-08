@@ -246,7 +246,7 @@ if __name__ == '__main__':
     parser.add_argument('--video_size', type=int, default=288)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--max_epochs', type=int, default=300)
-    parser.add_argument('--datasets_dir', type=str, default='./datasets/')
+    parser.add_argument('--datasets_dir', type=str, default='/data_smr/huze/projects/my_algonauts/datasets/')
     parser.add_argument('--roi', type=str, default="EBA")
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
     parser.add_argument('--gpus', type=str, default='1')
@@ -254,6 +254,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--val_random_split', default=False, action="store_true")
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
+    parser.add_argument('--early_stop_epochs', type=int, default=10)
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--asm", default=False, action="store_true")
@@ -265,7 +266,7 @@ if __name__ == '__main__':
     hparams = vars(args)
 
     dm = AlgonautsMINIDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, roi=args.roi,
-                                 num_frames=hparams['video_frames'], resolution=hparams['video_size'],
+                                 num_frames=args.video_frames, resolution=args.video_size,
                                  cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
     dm.setup()
     hparams['output_size'] = dm.num_voxels
@@ -282,7 +283,7 @@ if __name__ == '__main__':
     early_stop_callback = EarlyStopping(
         monitor='val_corr',
         min_delta=0.00,
-        patience=int(5/args.val_check_interval),
+        patience=int(args.early_stop_epochs/args.val_check_interval),
         verbose=False,
         mode='max'
     )
