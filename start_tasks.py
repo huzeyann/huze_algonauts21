@@ -42,7 +42,7 @@ for roi in rois:
         cloned_task_parameters = cloned_task.get_parameters()
         # cloned_task_parameters['rois'] = [roi]
         cloned_task_parameters['Args/roi'] = roi
-        cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['acg', 'max'] else 24
+        cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
         cloned_task_parameters['Args/debug'] = False
         cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
         cloned_task_parameters['Args/pooling_mode'] = pooling_sch
