@@ -359,11 +359,11 @@ def resnet3d50(num_classes=305, pretrained=True, **kwargs):
     return model
 
 
-def multi_resnet3d50(num_classes=292, pretrained=True, **kwargs):
+def multi_resnet3d50(num_classes=292, pretrained=True, cache_dir='~/.cache/', **kwargs):
     """Constructs a ResNet3D-50 model."""
     model = modify_resnets(ResNet3D(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, **kwargs))
     if pretrained:
-        model.load_state_dict(load_checkpoint(weights['multi_resnet3d50']))
+        model.load_state_dict(load_checkpoint(os.path.join(cache_dir, weights['multi_resnet3d50'])))
     return model
 
 

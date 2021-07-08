@@ -274,6 +274,7 @@ if __name__ == '__main__':
     parser.add_argument("--asm", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument('--predictions_dir', type=str, default='./predictions/v1/')
+    parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
 
 
     parser = LitI3DFC.add_model_specific_args(parser)
@@ -324,7 +325,7 @@ if __name__ == '__main__':
         # auto_lr_find=True,
     )
 
-    backbone = modify_resnets_patrial_x3(multi_resnet3d50())
+    backbone = modify_resnets_patrial_x3(multi_resnet3d50(cache_dir=args.cache_dir))
 
     plmodel = LitI3DFC(backbone, hparams)
 
