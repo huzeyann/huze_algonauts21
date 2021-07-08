@@ -26,7 +26,7 @@ queues_buffer = itertools.cycle(queue_names)
 
 task_ids = []
 
-pooling_schs = ['avg', 'no', 'max']
+pooling_schs = ['avg', 'no']
 
 for roi in rois:
     for pooling_sch in pooling_schs:
