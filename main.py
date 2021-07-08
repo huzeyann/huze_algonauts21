@@ -336,6 +336,9 @@ if __name__ == '__main__':
         plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
         prediction = trainer.predict(plmodel, datamodule=dm)
 
+        if not os.path.exists(args.predictions_dir):
+            os.system(f'mkdir {args.predictions_dir}')
+
         torch.save(prediction, os.path.join(args.predictions_dir, f'{args.roi}.pt'))
         torch.save(checkpoint_callback.best_model_score,
                    os.path.join(args.predictions_dir, f'{args.roi}-score-{checkpoint_callback.best_model_score:.6f}'))
