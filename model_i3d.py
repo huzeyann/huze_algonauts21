@@ -184,7 +184,7 @@ class MiniFC(nn.Module):
             input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
                         int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
         else:
-            levels = np.array([[1, 2, 2], [1, 2, 3], [1, 2, 3]])
+            levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
             self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
             input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
 

@@ -29,25 +29,7 @@ task = Task.init(
     auto_connect_streams=True,
 )
 
-# from torchmetrics.utilities import rank_zero_warn
-#
-#
-# def _pearson_corrcoef_update(
-#         preds: Tensor,
-#         target: Tensor,
-#         *_,
-# ) -> Tuple[Tensor, Tensor]:
-#     """ updates current estimates of the mean, cov and n_obs with new data for calculating pearsons correlation """
-#     # Data checking
-#     _check_same_shape(preds, target)
-#     preds = preds.squeeze()
-#     target = target.squeeze()
-#     if preds.ndim > 2 or target.ndim > 2:
-#         raise ValueError('Expected both predictions and target to be 2 dimensional tensors.')
-#
-#     return preds, target
-#
-#
+
 def _pearson_corrcoef_compute(preds: Tensor, target: Tensor, eps: float = 1e-6) -> Tensor:
     """ computes the final pearson correlation based on covariance matrix and number of observatiosn """
     dim = 1
