@@ -177,24 +177,24 @@ class MiniFC(nn.Module):
 
     def __init__(self, hparams):
         super(MiniFC, self).__init__()
+        self.no_pooling = True if hparams['pooling_mode'] == 'no' else False
+        self.conv31 = nn.Sequential(nn.Conv3d(1024, hparams['conv_size'], kernel_size=1, stride=1), )
 
-        self.conv31 = nn.Sequential(nn.Conv3d(1024, hparams['conv_size'], kernel_size=1, stride=1),
-                                    nn.BatchNorm3d(hparams['conv_size']),
-                                    nn.ReLU())
-        # input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
-        #             int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
-        # input_dim = hparams['conv_size']
-        # self.avgpool = nn.AdaptiveAvgPool3d(1)
-        levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
-        self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
-        input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
+        if self.no_pooling:
+            input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
+                        int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
+        else:
+            levels = np.array([[1, 2, 2], [1, 2, 3], [1, 2, 3]])
+            self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
+            input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
 
         self.fc = build_fc(hparams, input_dim, hparams['output_size'])
 
     def forward(self, x):
         x3 = x
         x3 = self.conv31(x3)
-        x3 = self.pyramidpool(x3)
+        if not self.no_pooling:
+            x3 = self.pyramidpool(x3)
 
         x = torch.cat([
             x3.reshape(x3.shape[0], -1),

@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import kornia as K
 import pytorch_lightning as pl
 from adabelief_pytorch import AdaBelief
-from pytorch_lightning.callbacks import BackboneFinetuning, ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import BackboneFinetuning, ModelCheckpoint, EarlyStopping, StochasticWeightAveraging
 from pytorch_lightning.core.lightning import LightningModule
 from pytorch_lightning.plugins import DDPPlugin
 from torch import Tensor
@@ -251,6 +251,8 @@ if __name__ == '__main__':
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
     parser.add_argument('--gpus', type=str, default='1')
     parser.add_argument('--val_check_interval', type=float, default=1.0)
+    parser.add_argument('--val_ratio', type=float, default=0.1)
+    parser.add_argument('--val_random_split', default=False, action="store_true")
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")
@@ -264,7 +266,7 @@ if __name__ == '__main__':
 
     dm = AlgonautsMINIDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, roi=args.roi,
                                  num_frames=hparams['video_frames'], resolution=hparams['video_size'],
-                                 cached=args.cached)
+                                 cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
     dm.setup()
     hparams['output_size'] = dm.num_voxels
 
@@ -272,17 +274,24 @@ if __name__ == '__main__':
         monitor='val_corr',
         dirpath='/home/huze/.cache/checkpoints',
         filename='MiniFC-{epoch:02d}-{val_corr:.6f}',
-        save_top_k=3,
+        save_weights_only=True,
+        save_top_k=2,
         mode='max',
     )
 
     early_stop_callback = EarlyStopping(
         monitor='val_corr',
         min_delta=0.00,
-        patience=3,
+        patience=int(5/args.val_check_interval),
         verbose=False,
         mode='max'
     )
+
+    finetune_callback = BackboneFinetuning(args.backbone_freeze_epochs)
+
+    callbacks = [early_stop_callback, finetune_callback]
+    if args.save_checkpoints:
+        callbacks.append(checkpoint_callback)
 
     trainer = pl.Trainer(
         precision=16 if args.fp16 else 32,
@@ -295,9 +304,7 @@ if __name__ == '__main__':
         max_epochs=args.max_epochs,
         checkpoint_callback=args.save_checkpoints,
         val_check_interval=args.val_check_interval,
-        callbacks=[BackboneFinetuning(args.backbone_freeze_epochs),
-                   checkpoint_callback,
-                   early_stop_callback],
+        callbacks=callbacks,
         # auto_lr_find=True,
     )
 
@@ -308,7 +315,10 @@ if __name__ == '__main__':
     # trainer.tune(plmodel, datamodule=dm)
     trainer.fit(plmodel, dm)
 
-    plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
-    prediction = trainer.predict(plmodel, datamodule=dm)
+    if args.save_checkpoints:
+        plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
+        prediction = trainer.predict(plmodel, datamodule=dm)
 
-    torch.save(prediction, os.path.join(args.predictions_dir, f'{args.roi}.pt'))
+        torch.save(prediction, os.path.join(args.predictions_dir, f'{args.roi}.pt'))
+        torch.save(checkpoint_callback.best_model_score,
+                   os.path.join(args.predictions_dir, f'{args.roi}-score-{checkpoint_callback.best_model_score:.6f}'))

@@ -120,8 +120,10 @@ class AlgonautsMINIDataModule(pl.LightningDataModule):
                  num_frames=16,
                  resolution=288,
                  val_ratio=0.1,
-                 cached=True):
+                 cached=True,
+                 random_split=False):
         super().__init__()
+        self.random_split = random_split
         self.cached = cached
         self.resolution = resolution
         self.val_ratio = val_ratio
@@ -152,13 +154,15 @@ class AlgonautsMINIDataModule(pl.LightningDataModule):
             )
             num_train = int(self.train_full_len * (1 - self.val_ratio))
             num_val = int(self.train_full_len * self.val_ratio)
-            # self.train_dataset, self.val_dataset = random_split(algonauts_full, [num_train, num_val],
-            #                                                     generator=torch.Generator().manual_seed(42))
-            lengths = [num_train, num_val]
-            indices = np.arange(sum(lengths)).tolist()
-            self.train_dataset, self.val_dataset = \
-                [Subset(algonauts_full, indices[offset - length: offset]) for offset, length in
-                 zip(_accumulate(lengths), lengths)]
+            if self.random_split:
+                self.train_dataset, self.val_dataset = random_split(algonauts_full, [num_train, num_val],
+                                                                    generator=torch.Generator().manual_seed(42))
+            else:
+                lengths = [num_train, num_val]
+                indices = np.arange(sum(lengths)).tolist()
+                self.train_dataset, self.val_dataset = \
+                    [Subset(algonauts_full, indices[offset - length: offset]) for offset, length in
+                     zip(_accumulate(lengths), lengths)]
             self.num_voxels = self.train_dataset[0][1].shape[0]
 
         # Assign Test split(s) for use in Dataloaders
