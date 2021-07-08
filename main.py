@@ -304,7 +304,9 @@ if __name__ == '__main__':
         mode='max'
     )
 
-    finetune_callback = BackboneFinetuning(args.backbone_freeze_epochs)
+    finetune_callback = BackboneFinetuning(
+        args.backbone_freeze_epochs if not args.debug else 1
+    )
 
     callbacks = [early_stop_callback, finetune_callback]
     if args.save_checkpoints:
@@ -316,9 +318,9 @@ if __name__ == '__main__':
         # accelerator='ddp',
         # plugins=DDPPlugin(find_unused_parameters=False),
         limit_train_batches=1.0 if not args.debug else 0.2,
-        # limit_val_batches=0.2,
+        limit_val_batches=1.0 if not args.debug else 0.5,
         # limit_test_batches=0.3,
-        max_epochs=args.max_epochs if not args.debug else 1,
+        max_epochs=args.max_epochs if not args.debug else 2,
         checkpoint_callback=args.save_checkpoints,
         val_check_interval=args.val_check_interval,
         callbacks=callbacks,
