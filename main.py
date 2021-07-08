@@ -14,6 +14,20 @@ from sam import SAM
 from utils import *
 from pyramidpooling import *
 
+from clearml import Task
+
+task = Task.init(
+    project_name='example',
+    task_name='task template',
+    tags=None,
+    reuse_last_task_id=True,
+    continue_last_task=False,
+    output_uri=None,
+    auto_connect_arg_parser=True,
+    auto_connect_frameworks=True,
+    auto_resource_monitoring=True,
+    auto_connect_streams=True,
+)
 
 # from torchmetrics.utilities import rank_zero_warn
 #
@@ -258,6 +272,7 @@ if __name__ == '__main__':
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--asm", default=False, action="store_true")
+    parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument('--predictions_dir', type=str, default='./predictions/v1/')
 
 
@@ -299,10 +314,10 @@ if __name__ == '__main__':
         gpus=args.gpus,
         # accelerator='ddp',
         # plugins=DDPPlugin(find_unused_parameters=False),
-        # limit_train_batches=0.2,
+        limit_train_batches=1.0 if not args.debug else 0.2,
         # limit_val_batches=0.2,
         # limit_test_batches=0.3,
-        max_epochs=args.max_epochs,
+        max_epochs=args.max_epochs if not args.debug else 1,
         checkpoint_callback=args.save_checkpoints,
         val_check_interval=args.val_check_interval,
         callbacks=callbacks,
