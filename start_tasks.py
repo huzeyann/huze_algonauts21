@@ -43,6 +43,7 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/roi'] = roi
         cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
         cloned_task_parameters['Args/debug'] = False
+        cloned_task_parameters['Args/early_stop_epochs'] = 15 if pooling_sch in ['avg', 'max'] else 5
         cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
         cloned_task_parameters['Args/pooling_mode'] = pooling_sch
         cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_{pooling_sch}/'
