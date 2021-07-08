@@ -28,9 +28,8 @@ task_ids = []
 
 pooling_schs = ['avg', 'no']
 
-for roi in rois:
-    for pooling_sch in pooling_schs:
-
+for pooling_sch in pooling_schs:
+    for roi in rois:
         queue = next(queues_buffer)
 
         cloned_task = Task.clone(source_task=template_task,
