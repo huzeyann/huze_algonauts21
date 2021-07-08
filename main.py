@@ -273,7 +273,7 @@ if __name__ == '__main__':
     parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--asm", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true")
-    parser.add_argument('--predictions_dir', type=str, default='./predictions/v1/')
+    parser.add_argument('--predictions_dir', type=str, default='/home/huze/.cache/predictions/v1/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
 
 
