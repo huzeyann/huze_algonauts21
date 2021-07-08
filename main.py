@@ -342,5 +342,5 @@ if __name__ == '__main__':
             os.system(f'mkdir {args.predictions_dir}')
 
         torch.save(prediction, os.path.join(args.predictions_dir, f'{args.roi}.pt'))
-        torch.save(checkpoint_callback.best_model_score,
-                   os.path.join(args.predictions_dir, f'{args.roi}-score-{checkpoint_callback.best_model_score:.6f}'))
+        # torch.save(checkpoint_callback.best_model_score,
+        #            os.path.join(args.predictions_dir, f'{args.roi}-score-{checkpoint_callback.best_model_score:.6f}'))
