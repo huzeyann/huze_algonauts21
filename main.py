@@ -7,6 +7,7 @@ from pytorch_lightning.callbacks import BackboneFinetuning, ModelCheckpoint, Ear
 from pytorch_lightning.core.lightning import LightningModule
 from pytorch_lightning.plugins import DDPPlugin
 from torch import Tensor
+from torch.nn import SyncBatchNorm
 
 from dataloading import AlgonautsMINIDataModule
 from model_i3d import *
@@ -121,6 +122,7 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--pooling_mode', type=str, default='avg')
         parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")
+        parser.add_argument('--global_pooling', default=False, action="store_true")
         return parser
 
     def forward(self, x):
