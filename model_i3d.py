@@ -183,6 +183,8 @@ class MiniFC(nn.Module):
             conv_indim = 1024
         elif hparams['backbone_type'] == 'x4':
             conv_indim = 2048
+        elif hparams['backbone_type'] == 'x2':
+            conv_indim = 512
         else:
             raise Exception("?")
         self.conv = nn.Sequential(nn.Conv3d(conv_indim, hparams['conv_size'], kernel_size=1, stride=1), )
@@ -194,15 +196,20 @@ class MiniFC(nn.Module):
             if self.no_pooling:
                 if hparams['backbone_type'] == 'x3':
                     input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
-                            int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
+                                int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
                 elif hparams['backbone_type'] == 'x4':
                     input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 16) * \
                                 int(hparams['video_size'] / 32) * int(hparams['video_size'] / 32)
+                elif hparams['backbone_type'] == 'x2':
+                    input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 4) * \
+                                int(hparams['video_size'] / 8) * int(hparams['video_size'] / 8)
             else:
                 if hparams['backbone_type'] == 'x3':
                     levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
                 elif hparams['backbone_type'] == 'x4':
                     levels = np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]])
+                elif hparams['backbone_type'] == 'x2':
+                    levels = np.array([[1, 2, 4], [1, 2, 4], [1, 2, 4]])
                 self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
                 input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
 
@@ -322,6 +329,23 @@ def modify_resnets_patrial_x4(model):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
+        return x
+
+    setattr(model.__class__, 'forward', forward)
+    return model
+
+
+def modify_resnets_patrial_x2(model):
+    del model.fc
+    del model.last_linear
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
         return x
 
     setattr(model.__class__, 'forward', forward)

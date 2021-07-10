@@ -316,6 +316,8 @@ if __name__ == '__main__':
         backbone = modify_resnets_patrial_x3(multi_resnet3d50(cache_dir=args.cache_dir))
     elif args.backbone_type == 'x4':
         backbone = modify_resnets_patrial_x4(multi_resnet3d50(cache_dir=args.cache_dir))
+    elif args.backbone_type == 'x2':
+        backbone = modify_resnets_patrial_x2(multi_resnet3d50(cache_dir=args.cache_dir))
     else:
         raise Exception("?")
 
