@@ -36,7 +36,7 @@ for pooling_sch in pooling_schs:
                                  name=template_task.name + f' {roi} {pooling_sch}',
                                  parent=template_task.id)
 
-        cloned_task.add_tags([roi, 'global_pool', 'x4'])
+        cloned_task.add_tags([roi, pooling_sch, 'x4'])
 
         cloned_task_parameters = cloned_task.get_parameters()
         # cloned_task_parameters['rois'] = [roi]
