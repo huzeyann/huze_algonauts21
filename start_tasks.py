@@ -36,22 +36,23 @@ for pooling_sch in pooling_schs:
                                  name=template_task.name + f' {roi} {pooling_sch}',
                                  parent=template_task.id)
 
-        cloned_task.add_tags([roi, pooling_sch, 'x4'])
+        cloned_task.add_tags([roi, pooling_sch, 'x2'])
 
         cloned_task_parameters = cloned_task.get_parameters()
         # cloned_task_parameters['rois'] = [roi]
         cloned_task_parameters['Args/roi'] = roi
         # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
         cloned_task_parameters['Args/batch_size'] = 24
-        cloned_task_parameters['Args/conv_size'] = 512
+        cloned_task_parameters['Args/conv_size'] = 512 if pooling_sch in ['avg', 'max'] else 128
+        cloned_task_parameters['Args/layer_hidden'] = 2048 if pooling_sch in ['avg', 'max'] else 512
         cloned_task_parameters['Args/debug'] = False
-        cloned_task_parameters['Args/early_stop_epochs'] = 15 if pooling_sch in ['avg', 'max'] else 5
+        cloned_task_parameters['Args/early_stop_epochs'] = 15 if pooling_sch in ['avg', 'max'] else 10
         # cloned_task_parameters['Args/early_stop_epochs'] = 15
         cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
         cloned_task_parameters['Args/pooling_mode'] = pooling_sch
         cloned_task_parameters['Args/global_pooling'] = global_pooling
         cloned_task_parameters['Args/save_checkpoints'] = True
-        cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x4_{pooling_sch}/'
+        cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x2_{pooling_sch}/'
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
 
         # put back into the new cloned task
@@ -73,14 +74,15 @@ for roi in rois:
                              name=template_task.name + f' {roi} {pooling_sch}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, 'global_pool', 'x4'])
+    cloned_task.add_tags([roi, 'global_pool', 'x2'])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
     cloned_task_parameters['Args/roi'] = roi
     # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
     cloned_task_parameters['Args/batch_size'] = 32
-    cloned_task_parameters['Args/conv_size'] = 2048
+    cloned_task_parameters['Args/conv_size'] = 512
+    cloned_task_parameters['Args/layer_hidden'] = 2048
     cloned_task_parameters['Args/debug'] = False
     # cloned_task_parameters['Args/early_stop_epochs'] = 15 if pooling_sch in ['avg', 'max'] else 5
     cloned_task_parameters['Args/early_stop_epochs'] = 15
@@ -89,7 +91,7 @@ for roi in rois:
     cloned_task_parameters['Args/global_pooling'] = global_pooling
     cloned_task_parameters['Args/save_checkpoints'] = True
     # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_{pooling_sch}/'
-    cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x4_global_pool/'
+    cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x2_global_pool/'
 
     # put back into the new cloned task
     cloned_task.set_parameters(cloned_task_parameters)
