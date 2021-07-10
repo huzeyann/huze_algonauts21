@@ -338,6 +338,8 @@ def modify_resnets_patrial_x4(model):
 def modify_resnets_patrial_x2(model):
     del model.fc
     del model.last_linear
+    del model.layer3
+    del model.layer4
 
     def forward(self, x):
         x = self.conv1(x)
