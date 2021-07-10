@@ -245,6 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--datasets_dir', type=str, default='/data_smr/huze/projects/my_algonauts/datasets/')
+    parser.add_argument('--backbone_type', type=str, default='x3')
     parser.add_argument('--roi', type=str, default="EBA")
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
     parser.add_argument('--gpus', type=str, default='1')
@@ -311,7 +312,12 @@ if __name__ == '__main__':
         # auto_lr_find=True,
     )
 
-    backbone = modify_resnets_patrial_x3(multi_resnet3d50(cache_dir=args.cache_dir))
+    if args.backbone_type == 'x3':
+        backbone = modify_resnets_patrial_x3(multi_resnet3d50(cache_dir=args.cache_dir))
+    elif args.backbone_type == 'x4':
+        backbone = modify_resnets_patrial_x4(multi_resnet3d50(cache_dir=args.cache_dir))
+    else:
+        raise Exception("?")
 
     plmodel = LitI3DFC(backbone, hparams)
 

@@ -179,33 +179,45 @@ class MiniFC(nn.Module):
         super(MiniFC, self).__init__()
         self.no_pooling = True if hparams['pooling_mode'] == 'no' else False
         self.global_pooling = hparams['global_pooling']
-        self.conv31 = nn.Sequential(nn.Conv3d(1024, hparams['conv_size'], kernel_size=1, stride=1), )
+        if hparams['backbone_type'] == 'x3':
+            conv_indim = 1024
+        elif hparams['backbone_type'] == 'x4':
+            conv_indim = 2048
+        else:
+            raise Exception("?")
+        self.conv = nn.Sequential(nn.Conv3d(conv_indim, hparams['conv_size'], kernel_size=1, stride=1), )
 
         if hparams['global_pooling']:
             self.global_avgpool = nn.AdaptiveAvgPool3d(1)
             input_dim = hparams['conv_size']
         else:
             if self.no_pooling:
-                input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
+                if hparams['backbone_type'] == 'x3':
+                    input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 8) * \
                             int(hparams['video_size'] / 16) * int(hparams['video_size'] / 16)
+                elif hparams['backbone_type'] == 'x4':
+                    input_dim = hparams['conv_size'] * int(hparams['video_frames'] / 16) * \
+                                int(hparams['video_size'] / 32) * int(hparams['video_size'] / 32)
             else:
-                levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
+                if hparams['backbone_type'] == 'x3':
+                    levels = np.array([[1, 2, 2], [1, 2, 4], [1, 2, 4]])
+                elif hparams['backbone_type'] == 'x4':
+                    levels = np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]])
                 self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
                 input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
 
         self.fc = build_fc(hparams, input_dim, hparams['output_size'])
 
     def forward(self, x):
-        x3 = x
-        x3 = self.conv31(x3)
+        x = self.conv(x)
         if not self.global_pooling:
             if not self.no_pooling:
-                x3 = self.pyramidpool(x3)
+                x = self.pyramidpool(x)
         else:
-            x3 = self.global_avgpool(x3)
+            x = self.global_avgpool(x)
 
         x = torch.cat([
-            x3.reshape(x3.shape[0], -1),
+            x.reshape(x.shape[0], -1),
         ], 1)
 
         out = self.fc(x)
