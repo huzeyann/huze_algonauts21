@@ -50,8 +50,8 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
         cloned_task_parameters['Args/pooling_mode'] = pooling_sch
         cloned_task_parameters['Args/global_pooling'] = global_pooling
-        cloned_task_parameters['Args/save_checkpoints'] = False
-        # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x4_{pooling_sch}/'
+        cloned_task_parameters['Args/save_checkpoints'] = True
+        cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x4_{pooling_sch}/'
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
 
         # put back into the new cloned task
@@ -87,9 +87,9 @@ for roi in rois:
     cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
     cloned_task_parameters['Args/pooling_mode'] = pooling_sch
     cloned_task_parameters['Args/global_pooling'] = global_pooling
-    cloned_task_parameters['Args/save_checkpoints'] = False
+    cloned_task_parameters['Args/save_checkpoints'] = True
     # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_{pooling_sch}/'
-    # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x4_global_pool/'
+    cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x4_global_pool/'
 
     # put back into the new cloned task
     cloned_task.set_parameters(cloned_task_parameters)
