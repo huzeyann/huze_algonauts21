@@ -173,40 +173,6 @@ class ResNet3D(nn.Module):
         return x
 
 
-class AvgFusion(nn.Module):
-    def __init__(self, fusion_type='concat'):
-        super(AvgFusion, self).__init__()
-        assert fusion_type in ['add', 'avg', 'concat', 'concatadd', 'concatavg']
-        self.fusion_type = fusion_type
-
-    def init_weights(self):
-        pass
-
-    def forward(self, input):
-        assert (isinstance(input, tuple))
-        after_avgpool = [F.adaptive_avg_pool3d(each, 1) for each in input]
-
-        if self.fusion_type == 'add':
-            out = torch.sum(torch.cat(after_avgpool, -1), -1, keepdim=True)
-
-        elif self.fusion_type == 'avg':
-            out = torch.mean(torch.cat(after_avgpool, -1), -1, keepdim=True)
-
-        elif self.fusion_type == 'concat':
-            out = torch.cat(after_avgpool, 1)
-
-        elif self.fusion_type == 'concatadd':
-            out_first = torch.cat(after_avgpool[:-1], 1)
-            out = torch.sum(torch.cat([out_first, after_avgpool[-1]], -1), -1, keepdim=True)
-        elif self.fusion_type == 'concatavg':
-            out_first = torch.cat(after_avgpool[:-1], 1)
-            out = torch.mean(torch.cat([out_first, after_avgpool[-1]], -1), -1, keepdim=True)
-        else:
-            raise ValueError
-
-        return out
-
-
 class MiniFC(nn.Module):
 
     def __init__(self, hparams):
@@ -300,6 +266,8 @@ class Pyramid(nn.Module):
 
     def __init__(self, hparams):
         super(Pyramid, self).__init__()
+        assert hparams.fc_fusion in ['concat', 'avg', 'avgconact']
+        self.hparams = hparams
         self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
         self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
         self.x3_twh = tuple(map(lambda x: int(x / 2), self.x2_twh))
@@ -369,10 +337,19 @@ class Pyramid(nn.Module):
                 for x_i in self.pyramid_layers
             })
 
-        self.final_fc = build_fc(hparams, hparams['layer_hidden'] * \
-                                 (len(self.pathways) if self.is_pyramid else 1) * \
-                                 len(self.level_dict['x1'][0]),
-                                 hparams['output_size'])
+        if hparams.fc_fusion == 'concat':
+            final_in_dim = hparams['layer_hidden'] * \
+                           (len(self.pathways) if self.is_pyramid else 1) * \
+                           len(self.pyramid_layers) * \
+                           len(self.level_dict['x1'][0])
+        elif hparams.fc_fusion == 'avg':
+            final_in_dim = hparams['layer_hidden']
+        elif hparams.fc_fusion == 'avgconcat':
+            final_in_dim = hparams['layer_hidden'] * \
+                           (len(self.pathways) if self.is_pyramid else 1) * \
+                           len(self.pyramid_layers)
+
+        self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
 
     def forward(self, x):
 
@@ -414,18 +391,41 @@ class Pyramid(nn.Module):
         return x_new
 
     def forward_fcs(self, x):
-        x_inter_alls = []
+        x_inter_alls = {}
         for x_i in x.keys():
+            k1 = f'{x_i}'
+            x_inter_alls[k1] = {}
             for j in range(len(self.level_dict[x_i][0])):
-                k1 = f'{x_i}'
                 k2 = f'level_{j}'
                 x[k1][k2] = self.fcs[k1][k2][:3](x[k1][k2])  # first layer
-                x_inter_alls.append(x[k1][k2].clone())
+                x_inter_alls[k1][k2] = x[k1][k2].clone()
                 x[k1][k2] = self.fcs[k1][k2][3:](x[k1][k2])  # aux head
-        x_inter_alls = torch.cat(x_inter_alls, 1)
+        x_inter_alls = self.fusion(x_inter_alls, self.hparams.fc_fusion)
         x_final = self.final_fc(x_inter_alls)
 
         return x, x_final
+
+    @staticmethod
+    def fusion(x, type):
+        if type == 'concat':
+            x_all = torch.cat([v2 for k1, v1 in x.items() for k2, v2 in v1.items()], 1)
+        elif type == 'avg':
+            x_all = torch.stack([v2 for k1, v1 in x.items() for k2, v2 in v1.items()], -1)
+            x_all = x_all.mean(-1)
+        elif type == 'avgconcat':
+            x_all = []
+            for k1, v1 in x.items():
+                x_tmp = []
+                for k2, v2 in v1.items():
+                    x_tmp.append(v2)
+                x_tmp = torch.stack(x_tmp, -1)
+                x_tmp = x_tmp.mean(-1)
+                x_all.append(x_tmp)
+            x_all = torch.cat(x_all, 1)
+        else:
+            NotImplementedError()
+
+        return x_all
 
     @staticmethod
     def resample_and_add(x, y):
