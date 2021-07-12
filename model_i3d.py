@@ -173,6 +173,40 @@ class ResNet3D(nn.Module):
         return x
 
 
+class AvgFusion(nn.Module):
+    def __init__(self, fusion_type='concat'):
+        super(AvgFusion, self).__init__()
+        assert fusion_type in ['add', 'avg', 'concat', 'concatadd', 'concatavg']
+        self.fusion_type = fusion_type
+
+    def init_weights(self):
+        pass
+
+    def forward(self, input):
+        assert (isinstance(input, tuple))
+        after_avgpool = [F.adaptive_avg_pool3d(each, 1) for each in input]
+
+        if self.fusion_type == 'add':
+            out = torch.sum(torch.cat(after_avgpool, -1), -1, keepdim=True)
+
+        elif self.fusion_type == 'avg':
+            out = torch.mean(torch.cat(after_avgpool, -1), -1, keepdim=True)
+
+        elif self.fusion_type == 'concat':
+            out = torch.cat(after_avgpool, 1)
+
+        elif self.fusion_type == 'concatadd':
+            out_first = torch.cat(after_avgpool[:-1], 1)
+            out = torch.sum(torch.cat([out_first, after_avgpool[-1]], -1), -1, keepdim=True)
+        elif self.fusion_type == 'concatavg':
+            out_first = torch.cat(after_avgpool[:-1], 1)
+            out = torch.mean(torch.cat([out_first, after_avgpool[-1]], -1), -1, keepdim=True)
+        else:
+            raise ValueError
+
+        return out
+
+
 class MiniFC(nn.Module):
 
     def __init__(self, hparams):
@@ -260,6 +294,144 @@ def build_fc(p, input_dim, output_dim):
     module_list.append(nn.Linear(out_size, output_dim))
 
     return nn.Sequential(*module_list)
+
+
+class Pyramid(nn.Module):
+
+    def __init__(self, hparams):
+        super(Pyramid, self).__init__()
+        self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
+        self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
+        self.x3_twh = tuple(map(lambda x: int(x / 2), self.x2_twh))
+        self.x4_twh = tuple(map(lambda x: int(x / 2), self.x3_twh))
+        self.x1_c, self.x2_c, self.x3_c, self.x4_c = 256, 512, 1024, 2048
+        self.twh_dict = {'x1': self.x1_twh, 'x2': self.x2_twh, 'x3': self.x3_twh, 'x4': self.x4_twh}
+        self.c_dict = {'x1': self.x1_c, 'x2': self.x2_c, 'x3': self.x3_c, 'x4': self.x4_c}
+
+        self.planes = hparams['conv_size']
+        self.pyramid_layers = hparams['pyramid_layers'].split(',')  # x1,x2,x3,x4
+        self.pyramid_layers.sort()
+        self.is_pyramid = False if len(self.pyramid_layers) > 1 else False
+        self.pathways = hparams['pathways'].split(',')  # ['topdown', 'bottomup'] aka 'parallel'
+        if self.is_pyramid:
+            assert len(self.pathways) >= 1
+        else:
+            assert len(self.pathways) == 0
+
+        # convs
+        self.first_convs = nn.ModuleDict({
+            x_i: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)
+            for x_i in self.pyramid_layers
+        })
+
+        # smooth
+        if self.is_pyramid:
+            self.smooths = nn.ModuleDict()
+            for pathway in self.pathways:
+                smooths = nn.ModuleDict({
+                    f'{pathway}_{x_i}': nn.Conv3d(self.planes, self.planes, kernel_size=3, stride=1, padding='same')
+                    for x_i in self.pyramid_layers
+                })
+                self.smooths.update(smooths)
+        else:
+            self.smooths = None
+
+        self.level_dict = {
+            'x1': np.array([[1, 2, 4], [1, 2, 3], [1, 2, 3]]),
+            'x2': np.array([[1, 2, 4], [1, 2, 3], [1, 2, 3]]),
+            'x3': np.array([[1, 1, 2], [1, 2, 3], [1, 2, 3]]),
+            'x4': np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]]),
+        }
+        self.pyramidpools = nn.ModuleDict({
+            x_i: SpatialPyramidPooling(self.level_dict[x_i], hparams['pooling_mode'], hparams['softpool'])
+            for x_i in self.pyramid_layers
+        })
+
+        self.fc_input_dims = {
+            x_i: self.level_dict[x_i][0] * self.level_dict[x_i][1] * self.level_dict[x_i][2] * self.planes
+            for x_i in self.pyramid_layers
+        }
+
+        if self.is_pyramid:
+            self.fcs = nn.ModuleDict()
+            for pathway in self.pathways:
+                fcs = nn.ModuleDict({
+                    f'{pathway}_{x_i}': nn.ModuleDict(
+                        {f'level_{j}': build_fc(hparams, self.fc_input_dims[x_i][j], hparams['output_size'])
+                         for j in range(len(self.level_dict[x_i][0]))})
+                    for x_i in self.pyramid_layers
+                })
+                self.fcs.update(fcs)
+        else:
+            self.fcs = nn.ModuleDict({
+                x_i: nn.ModuleDict({f'level_{j}': build_fc(hparams, self.fc_input_dims[x_i][j], hparams['output_size'])
+                                    for j in range(len(self.level_dict[x_i][0]))})
+                for x_i in self.pyramid_layers
+            })
+
+        self.final_fc = build_fc(hparams, hparams['layer_hidden'] * \
+                                 (len(self.pathways) if self.is_pyramid else 1) * \
+                                 len(self.level_dict['x1'][0]),
+                                 hparams['output_size'])
+
+    def forward(self, x):
+
+        # first conv
+        x = dict(x[x_i] for x_i in self.pyramid_layers)
+        x = {k: self.first_convs[k](v) for k, v in x.items()}
+
+        if self.is_pyramid:
+            x_all = {}
+            if 'topdown' in self.pathways:
+                x_topdown = self.pyramid_pathway(x, list(reversed(self.pyramid_layers)), 'topdown_')
+                x_all.update(x_topdown)
+            if 'bottomup' in self.pathways:
+                x_bottomup = self.pyramid_pathway(x, self.pyramid_layers, 'bottomup_')
+                x_all.update(x_bottomup)
+            # 3x3 smooth
+            x_all = {k: self.smooths[k](v) for k, v in x_all.items()}
+            # pooling
+            x_all = {k: self.pyramidpools[k.split('-')[-1]](v) for k, v in x_all.items()}
+            x_aux, x_final = self.forward_fcs(x_all)
+
+        else:  # one layer only (no smooth)
+            x = {k: self.pyramidpools[k](v) for k, v in x.items()}
+            x_aux, x_final = self.forward_fcs(x)
+
+        return x_final, x_aux
+
+    def pyramid_pathway(self, x, layers, prefix):
+        x_new = {}
+        for i, x_i in enumerate(layers):
+            k = f'{prefix}{x_i}'
+            if i == 0:
+                x_new[k] = x[x_i].clone()
+            else:
+                x_new[k] = self.resample_and_add(prev, x[x_i].clone())
+                x_new[k] = self.smooths[k](x_new[k])
+            # x_new[k] = self.smooths[k](x_new[k]) #TODO: smooth for top layer?
+            prev = x_new[k]
+        return x_new
+
+    def forward_fcs(self, x):
+        x_inter_alls = []
+        for x_i in x.keys():
+            for j in range(len(self.level_dict[x_i][0])):
+                k1 = f'{x_i}'
+                k2 = f'level_{j}'
+                x[k1][k2] = self.fcs[k1][k2][:3](x[k1][k2])  # first layer
+                x_inter_alls.append(x[k1][k2].clone())
+                x[k1][k2] = self.fcs[k1][k2][3:](x[k1][k2])  # aux head
+        x_inter_alls = torch.cat(x_inter_alls, 1)
+        x_final = self.final_fc(x_inter_alls)
+
+        return x, x_final
+
+    @staticmethod
+    def resample_and_add(x, y):
+        target_shape = y.shape[2:]
+        out = F.interpolate(x, size=target_shape, mode='nearest')
+        return out + y
 
 
 def modify_resnets(model):
@@ -367,7 +539,12 @@ def modify_resnets_patrial_x_all(model):
         x2 = self.layer2(x1)
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
-        return x1, x2, x3, x4
+        return {
+            'x1': x1,
+            'x2': x2,
+            'x3': x3,
+            'x4': x4,
+        }
 
     setattr(model.__class__, 'forward', forward)
     return model

@@ -106,7 +106,10 @@ class LitI3DFC(LightningModule):
 
         # self.backbone = nn.SyncBatchNorm.convert_sync_batchnorm(backbone) # slooooow
 
-        self.minifc = MiniFC(hparams)
+        if self.hparams.backbone_type == 'all':
+            self.neck = ...
+        else:
+            self.neck = MiniFC(hparams)
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -126,8 +129,8 @@ class LitI3DFC(LightningModule):
         return parser
 
     def forward(self, x):
-        x3 = self.backbone(x)
-        out = self.minifc(x3)
+        x = self.backbone(x)
+        out = self.neck(x)
         return out
 
     def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
@@ -203,12 +206,12 @@ class LitI3DFC(LightningModule):
                 'lr': self.hparams.learning_rate * self.hparams.backbone_lr_ratio,
             },
             {
-                "params": [p for n, p in self.minifc.named_parameters() if not any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.neck.named_parameters() if not any(nd in n for nd in no_decay)],
                 "weight_decay": self.hparams.weight_decay,
                 'lr': self.hparams.learning_rate,
             },
             {
-                "params": [p for n, p in self.minifc.named_parameters() if any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.neck.named_parameters() if any(nd in n for nd in no_decay)],
                 "weight_decay": 0.0,
                 'lr': self.hparams.learning_rate,
             },
@@ -318,8 +321,10 @@ if __name__ == '__main__':
         backbone = modify_resnets_patrial_x4(multi_resnet3d50(cache_dir=args.cache_dir))
     elif args.backbone_type == 'x2':
         backbone = modify_resnets_patrial_x2(multi_resnet3d50(cache_dir=args.cache_dir))
+    elif args.backbone_type == 'all':
+        backbone = modify_resnets_patrial_x_all(multi_resnet3d50(cache_dir=args.cache_dir))
     else:
-        raise Exception("?")
+        NotImplementedError()
 
     plmodel = LitI3DFC(backbone, hparams)
 
