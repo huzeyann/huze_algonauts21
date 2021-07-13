@@ -46,7 +46,7 @@ class PyramidPooling(nn.Module):
         """
         num_sample = previous_conv.size(0)
         previous_conv_size = [int(previous_conv.size(2)), int(previous_conv.size(3)), int(previous_conv.size(4))]
-        pooled_xs = dict()
+        # pooled_xs = dict()
         for i in range(len(levels[0])):
             t_kernel = int(math.ceil(previous_conv_size[0] / levels[0][i]))
             h_kernel = int(math.ceil(previous_conv_size[1] / levels[1][i]))
@@ -76,13 +76,13 @@ class PyramidPooling(nn.Module):
             else:
                 raise RuntimeError("Unknown pooling type: %s, please use \"max\" or \"avg\".")
             x = pool(padded_input)
-            pooled_xs[f'level_{i}'] = x.view(num_sample, -1)
-            # if i == 0:
-            #     spp = x.view(num_sample, -1)
-            # else:
-            #     spp = torch.cat((spp, x.view(num_sample, -1)), 1)
+            # pooled_xs[f'level_{i}'] = x.view(num_sample, -1)
+            if i == 0:
+                spp = x.view(num_sample, -1)
+            else:
+                spp = torch.cat((spp, x.view(num_sample, -1)), 1)
 
-        return pooled_xs
+        return spp
 
 
 class SpatialPyramidPooling(PyramidPooling):

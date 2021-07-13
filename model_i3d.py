@@ -220,6 +220,7 @@ class MiniFC(nn.Module):
         if not self.global_pooling:
             if not self.no_pooling:
                 x = self.pyramidpool(x)
+                # x = torch.cat([v for k, v in x.items()], 1)
         else:
             x = self.global_avgpool(x)
 
@@ -232,7 +233,7 @@ class MiniFC(nn.Module):
         return out
 
 
-def build_fc(p, input_dim, output_dim):
+def build_fc(p, input_dim, output_dim, part='full'):
     activations = {
         'relu': nn.ReLU(),
         'sigmoid': nn.Sigmoid(),
@@ -252,6 +253,8 @@ def build_fc(p, input_dim, output_dim):
             module_list.append(nn.BatchNorm1d(out_size))
         module_list.append(activations[p.get('activation')])
         module_list.append(nn.Dropout(p.get("dropout_rate")))
+        if i == 0:
+            layer_one_size = len(module_list)
 
     if p.get(f"num_layers") == 0:
         out_size = input_dim
@@ -259,14 +262,52 @@ def build_fc(p, input_dim, output_dim):
     # last layer
     module_list.append(nn.Linear(out_size, output_dim))
 
+    if part == 'full':
+        module_list = module_list
+    elif part == 'first':
+        module_list = module_list[:layer_one_size]
+    elif part == 'last':
+        module_list = module_list[layer_one_size:]
+    else:
+        NotImplementedError()
+
     return nn.Sequential(*module_list)
+
+
+class FcFusion(nn.Module):
+    def __init__(self, fusion_type='concat'):
+        super(FcFusion, self).__init__()
+        assert fusion_type in ['add', 'avg', 'concat', ]
+        self.fusion_type = fusion_type
+
+    def init_weights(self):
+        pass
+
+    def forward(self, input):
+        assert (isinstance(input, tuple)) or (isinstance(input, dict))
+        if isinstance(input, dict):
+            input = tuple(input.values())
+
+        if self.fusion_type == 'add':
+            out = torch.sum(torch.stack(input, -1), -1, keepdim=False)
+
+        elif self.fusion_type == 'avg':
+            out = torch.mean(torch.stack(input, -1), -1, keepdim=False)
+
+        elif self.fusion_type == 'concat':
+            out = torch.cat(input, -1)
+
+        else:
+            raise ValueError
+
+        return out
 
 
 class Pyramid(nn.Module):
 
     def __init__(self, hparams):
         super(Pyramid, self).__init__()
-        assert hparams.fc_fusion in ['concat', 'avg', 'avgconact']
+        assert hparams.fc_fusion in ['concat', 'add', 'avg']
         self.hparams = hparams
         self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
         self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
@@ -275,157 +316,111 @@ class Pyramid(nn.Module):
         self.x1_c, self.x2_c, self.x3_c, self.x4_c = 256, 512, 1024, 2048
         self.twh_dict = {'x1': self.x1_twh, 'x2': self.x2_twh, 'x3': self.x3_twh, 'x4': self.x4_twh}
         self.c_dict = {'x1': self.x1_c, 'x2': self.x2_c, 'x3': self.x3_c, 'x4': self.x4_c}
-
         self.planes = hparams['conv_size']
         self.pyramid_layers = hparams['pyramid_layers'].split(',')  # x1,x2,x3,x4
         self.pyramid_layers.sort()
-        self.is_pyramid = False if len(self.pyramid_layers) > 1 else False
         self.pathways = hparams['pathways'].split(',')  # ['topdown', 'bottomup'] aka 'parallel'
-        if self.is_pyramid:
-            assert len(self.pathways) >= 1
-        else:
-            assert len(self.pathways) == 0
-
-        # convs
-        self.first_convs = nn.ModuleDict({
-            x_i: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)
-            for x_i in self.pyramid_layers
-        })
-
-        # smooth
-        if self.is_pyramid:
-            self.smooths = nn.ModuleDict()
-            for pathway in self.pathways:
-                smooths = nn.ModuleDict({
-                    f'{pathway}_{x_i}': nn.Conv3d(self.planes, self.planes, kernel_size=3, stride=1, padding='same')
-                    for x_i in self.pyramid_layers
-                })
-                self.smooths.update(smooths)
-        else:
-            self.smooths = None
-
-        self.level_dict = {
-            'x1': np.array([[1, 2, 4], [1, 2, 3], [1, 2, 3]]),
-            'x2': np.array([[1, 2, 4], [1, 2, 3], [1, 2, 3]]),
+        self.is_pyramid = False if self.pathways[0] == 'none' else True
+        self.aux_heads = True if hparams['aux_loss_weight'] > 0 else False
+        self.pooling_modes = {  # pooling_mode in ['no', 'spp', 'avg']
+            'x1': hparams['x1_pooling_mode'],
+            'x2': hparams['x2_pooling_mode'],
+            'x3': hparams['x3_pooling_mode'],
+            'x4': hparams['x4_pooling_mode'],
+        }
+        self.spp_level_dict = {
+            'x1': np.array([[1, 2, 4], [1, 2, 4], [1, 2, 4]]),
+            'x2': np.array([[1, 2, 4], [1, 2, 4], [1, 2, 4]]),
             'x3': np.array([[1, 1, 2], [1, 2, 3], [1, 2, 3]]),
-            'x4': np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]]),
+            'x4': np.array([[1, 1], [1, 2], [1, 2]]),
         }
-        self.pyramidpools = nn.ModuleDict({
-            x_i: SpatialPyramidPooling(self.level_dict[x_i], hparams['pooling_mode'], hparams['softpool'])
-            for x_i in self.pyramid_layers
-        })
-
-        self.fc_input_dims = {
-            x_i: self.level_dict[x_i][0] * self.level_dict[x_i][1] * self.level_dict[x_i][2] * self.planes
-            for x_i in self.pyramid_layers
-        }
-
         if self.is_pyramid:
-            self.fcs = nn.ModuleDict()
+            assert len(self.pathways) >= 1 and self.pathways[0] != 'none'
+
+        self.first_convs = nn.ModuleDict()
+        self.smooths = nn.ModuleDict()
+        self.poolings = nn.ModuleDict()
+        self.fc_input_dims = {}
+        self.first_fcs = nn.ModuleDict()
+        self.aux_fcs = nn.ModuleDict()
+
+        for x_i in self.pyramid_layers:
             for pathway in self.pathways:
-                fcs = nn.ModuleDict({
-                    f'{pathway}_{x_i}': nn.ModuleDict(
-                        {f'level_{j}': build_fc(hparams, self.fc_input_dims[x_i][j], hparams['output_size'])
-                         for j in range(len(self.level_dict[x_i][0]))})
-                    for x_i in self.pyramid_layers
-                })
-                self.fcs.update(fcs)
-        else:
-            self.fcs = nn.ModuleDict({
-                x_i: nn.ModuleDict({f'level_{j}': build_fc(hparams, self.fc_input_dims[x_i][j], hparams['output_size'])
-                                    for j in range(len(self.level_dict[x_i][0]))})
-                for x_i in self.pyramid_layers
-            })
+                k = f'{pathway}_{x_i}'
+                self.first_convs.update({k: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)})
+
+                if self.is_pyramid:
+                    self.smooths.update(
+                        {k: nn.Conv3d(self.planes, self.planes, kernel_size=3, stride=1, padding='same')})
+
+                if self.pooling_modes[x_i] == 'no':
+                    self.poolings.update({k: nn.Flatten()})
+                    self.fc_input_dims.update({k: self.planes * np.product(self.twh_dict[x_i])})
+                elif self.pooling_modes[x_i] == 'avg':
+                    self.poolings.update({k: nn.AdaptiveAvgPool3d(1)})
+                    self.fc_input_dims.update({k: self.planes})
+                elif self.pooling_modes[x_i] == 'spp':
+                    self.poolings.update({k: SpatialPyramidPooling(self.spp_level_dict[x_i],
+                                                                   hparams['pooling_mode'],
+                                                                   hparams['softpool'])})
+                    self.fc_input_dims.update({k: np.sum(
+                        self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][
+                            2]) * self.planes})
+                else:
+                    NotImplementedError()
+
+                self.first_fcs.update({k: build_fc(
+                    hparams, self.fc_input_dims[k], hparams['output_size'], part='first')})
+                self.aux_fcs.update({k: build_fc(
+                    hparams, self.fc_input_dims[k], hparams['output_size'], part='last')})
 
         if hparams.fc_fusion == 'concat':
             final_in_dim = hparams['layer_hidden'] * \
-                           (len(self.pathways) if self.is_pyramid else 1) * \
-                           len(self.pyramid_layers) * \
-                           len(self.level_dict['x1'][0])
-        elif hparams.fc_fusion == 'avg':
-            final_in_dim = hparams['layer_hidden']
-        elif hparams.fc_fusion == 'avgconcat':
-            final_in_dim = hparams['layer_hidden'] * \
-                           (len(self.pathways) if self.is_pyramid else 1) * \
+                           len(self.pathways) * \
                            len(self.pyramid_layers)
-
-        self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
-
-    def forward(self, x):
-
-        # first conv
-        x = dict(x[x_i] for x_i in self.pyramid_layers)
-        x = {k: self.first_convs[k](v) for k, v in x.items()}
-
-        if self.is_pyramid:
-            x_all = {}
-            if 'topdown' in self.pathways:
-                x_topdown = self.pyramid_pathway(x, list(reversed(self.pyramid_layers)), 'topdown_')
-                x_all.update(x_topdown)
-            if 'bottomup' in self.pathways:
-                x_bottomup = self.pyramid_pathway(x, self.pyramid_layers, 'bottomup_')
-                x_all.update(x_bottomup)
-            # 3x3 smooth
-            x_all = {k: self.smooths[k](v) for k, v in x_all.items()}
-            # pooling
-            x_all = {k: self.pyramidpools[k.split('-')[-1]](v) for k, v in x_all.items()}
-            x_aux, x_final = self.forward_fcs(x_all)
-
-        else:  # one layer only (no smooth)
-            x = {k: self.pyramidpools[k](v) for k, v in x.items()}
-            x_aux, x_final = self.forward_fcs(x)
-
-        return x_final, x_aux
-
-    def pyramid_pathway(self, x, layers, prefix):
-        x_new = {}
-        for i, x_i in enumerate(layers):
-            k = f'{prefix}{x_i}'
-            if i == 0:
-                x_new[k] = x[x_i].clone()
-            else:
-                x_new[k] = self.resample_and_add(prev, x[x_i].clone())
-                x_new[k] = self.smooths[k](x_new[k])
-            # x_new[k] = self.smooths[k](x_new[k]) #TODO: smooth for top layer?
-            prev = x_new[k]
-        return x_new
-
-    def forward_fcs(self, x):
-        x_inter_alls = {}
-        for x_i in x.keys():
-            k1 = f'{x_i}'
-            x_inter_alls[k1] = {}
-            for j in range(len(self.level_dict[x_i][0])):
-                k2 = f'level_{j}'
-                x[k1][k2] = self.fcs[k1][k2][:3](x[k1][k2])  # first layer
-                x_inter_alls[k1][k2] = x[k1][k2].clone()
-                x[k1][k2] = self.fcs[k1][k2][3:](x[k1][k2])  # aux head
-        x_inter_alls = self.fusion(x_inter_alls, self.hparams.fc_fusion)
-        x_final = self.final_fc(x_inter_alls)
-
-        return x, x_final
-
-    @staticmethod
-    def fusion(x, type):
-        if type == 'concat':
-            x_all = torch.cat([v2 for k1, v1 in x.items() for k2, v2 in v1.items()], 1)
-        elif type == 'avg':
-            x_all = torch.stack([v2 for k1, v1 in x.items() for k2, v2 in v1.items()], -1)
-            x_all = x_all.mean(-1)
-        elif type == 'avgconcat':
-            x_all = []
-            for k1, v1 in x.items():
-                x_tmp = []
-                for k2, v2 in v1.items():
-                    x_tmp.append(v2)
-                x_tmp = torch.stack(x_tmp, -1)
-                x_tmp = x_tmp.mean(-1)
-                x_all.append(x_tmp)
-            x_all = torch.cat(x_all, 1)
+        elif hparams.fc_fusion == 'add' or hparams.fc_fusion == 'avg':
+            final_in_dim = hparams['layer_hidden']
         else:
             NotImplementedError()
 
-        return x_all
+        self.final_fusion = FcFusion(fusion_type=hparams.fc_fusion)
+        hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
+        self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
+
+    def forward(self, x):
+        # drop x (clone for parallel path)
+        x = {f'{pathway}_{x_i}': x[x_i].clone() for x_i in self.pyramid_layers for pathway in self.pathways}
+        x = {k: self.first_convs[k](v) for k, v in x.items()}
+        if self.is_pyramid:
+            x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
+        x = {k: self.poolings[k](v) for k, v in x.items()}
+        x = {k: self.first_fcs[k](v) for k, v in x.items()}
+        # aux fc
+        out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else {}
+        # final fc
+        out = self.final_fc(self.final_fusion(x))
+
+        return out, out_aux
+
+    def pyramid_pathway(self, x, layers, pathways):
+        for pathway in pathways:
+
+            if pathway == 'bottomup':
+                layers_iter = layers
+            elif pathway == 'topdown':
+                layers_iter = reversed(layers)
+            else:
+                NotImplementedError()
+
+            for i, x_i in enumerate(layers_iter):
+                k = f'{pathway}_{x_i}'
+                if i == 0:
+                    pass
+                else:
+                    x[k] = self.resample_and_add(prev, x[k])
+                x[k] = self.smooths[k](x[k])
+                prev = x[k]
+        return x
 
     @staticmethod
     def resample_and_add(x, y):
