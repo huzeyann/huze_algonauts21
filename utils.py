@@ -197,6 +197,19 @@ def load_fmri(base_fmri_dir, rois, subs):
 
     return all_fmri, keys, idx_ends, lens
 
+def load_fmri_wb(base_fmri_dir, roi, subs):
+    # rois = ['WB']
+    # subs = ['sub01', 'sub02', 'sub03', 'sub04', 'sub05', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10']
+    track = "full_track"
+    from itertools import product
+
+    fmri_dict = {
+        sub: get_fmri(os.path.join(base_fmri_dir, track, sub), roi)
+        for sub in subs
+    }
+
+    return fmri_dict
+
 
 def load_videos(video_dir, transform, num_segments=16):
     video_list = glob.glob(video_dir + '/*.mp4')

@@ -21,8 +21,8 @@ import kornia as K
 import decord
 from decord import VideoReader, cpu, gpu
 
-
 # decord.bridge.set_bridge('torch')
+from utils import concat_and_mask
 
 
 def load_video(file, num_frames, load_transform):
@@ -72,16 +72,21 @@ def wrap_load_fmris(root, file_list):
     return fmris
 
 
-class AlgonautsMINI(Dataset):
-    def __init__(self, dataset_dir, roi='EBA', num_frames=16, resolution=288, train=True, cached=True):
+class AlgonautsDataset(Dataset):
+    def __init__(self, dataset_dir, roi='EBA', num_frames=16, resolution=288,
+                 train=True, cached=True, track='mini_track', subs='all'):
         self.resolution = resolution
         self.cached = cached
         self.roi = roi
         self.num_frames = num_frames
         self.train = train
         self.dataset_dir = dataset_dir
+        self.subs = [f'sub{i + 1:02d}' for i in range(10)] if subs == 'all' else subs
         csv_path = os.path.join(self.dataset_dir, 'train_val.csv' if train else 'predict.csv')
         self.file_df = pd.read_csv(csv_path)
+        self.track = track
+        if self.track == 'full_track':
+            assert self.roi == 'WB'
 
         # load
         if self.cached:  # this can get big
@@ -99,8 +104,13 @@ class AlgonautsMINI(Dataset):
                                            self.file_df['vid'].values,
                                            self.num_frames, self.resolution)
         if train:
-            self.fmris = wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
-                                         self.file_df[self.roi].values)
+            if self.track == 'minitrack':
+                self.fmris = wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
+                                             self.file_df[self.roi].values)
+            elif self.track == 'full_track':
+                self.fmris, self.idx_ends = concat_and_mask(
+                    [wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'), self.file_df[sub].values)
+                     for sub in self.subs])
 
     def __len__(self):
         return len(self.videos)
@@ -112,17 +122,21 @@ class AlgonautsMINI(Dataset):
             return self.videos[index]
 
 
-class AlgonautsMINIDataModule(pl.LightningDataModule):
+class AlgonautsDataModule(pl.LightningDataModule):
 
     def __init__(self, batch_size=1,
                  datasets_dir='',
                  roi='EBA',
+                 track='mini_track',
+                 subs='all',
                  num_frames=16,
                  resolution=288,
                  val_ratio=0.1,
                  cached=True,
                  random_split=False):
         super().__init__()
+        self.subs = subs
+        self.track = track
         self.random_split = random_split
         self.cached = cached
         self.resolution = resolution
@@ -144,13 +158,15 @@ class AlgonautsMINIDataModule(pl.LightningDataModule):
 
         # Assign Train/val split(s) for use in Dataloaders
         if stage in (None, 'fit'):
-            algonauts_full = AlgonautsMINI(
+            algonauts_full = AlgonautsDataset(
                 self.datasets_dir,
                 train=True,
                 roi=self.roi,
                 num_frames=self.num_frames,
                 resolution=self.resolution,
                 cached=self.cached,
+                track=self.track,
+                subs=self.subs
             )
             num_train = int(self.train_full_len * (1 - self.val_ratio))
             num_val = int(self.train_full_len * self.val_ratio)
@@ -167,13 +183,15 @@ class AlgonautsMINIDataModule(pl.LightningDataModule):
 
         # Assign Test split(s) for use in Dataloaders
         if stage in (None, 'test'):
-            self.test_dataset = AlgonautsMINI(
+            self.test_dataset = AlgonautsDataset(
                 self.datasets_dir,
                 train=False,
                 roi='',
                 num_frames=self.num_frames,
                 resolution=self.resolution,
                 cached=self.cached,
+                track=self.track,
+                subs=self.subs
             )
             self.num_voxels = getattr(self, 'num_voxels')
 
@@ -195,7 +213,8 @@ class AlgonautsMINIDataModule(pl.LightningDataModule):
 
 
 if __name__ == '__main__':
-    d = AlgonautsMINI('datasets/')
-    a = AlgonautsMINIDataModule(32, 'datasets/')
+    d = AlgonautsDataset('datasets/')
+    a = AlgonautsDataModule(32, 'datasets/')
+    b = AlgonautsDataModule(32, 'datasets_full/', track='full_track')
     a.setup()
     pass

@@ -9,7 +9,7 @@ from pytorch_lightning.plugins import DDPPlugin
 from torch import Tensor
 from torch.nn import SyncBatchNorm
 
-from dataloading import AlgonautsMINIDataModule
+from dataloading import AlgonautsDataModule
 from model_i3d import *
 from sam import SAM
 from utils import *
@@ -269,9 +269,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = vars(args)
 
-    dm = AlgonautsMINIDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, roi=args.roi,
-                                 num_frames=args.video_frames, resolution=args.video_size,
-                                 cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
+    dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, roi=args.roi,
+                             num_frames=args.video_frames, resolution=args.video_size,
+                             cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
     dm.setup()
     hparams['output_size'] = dm.num_voxels
 

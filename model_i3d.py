@@ -395,9 +395,7 @@ class Pyramid(nn.Module):
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
         x = {k: self.poolings[k](v) for k, v in x.items()}
         x = {k: self.first_fcs[k](v) for k, v in x.items()}
-        # aux fc
         out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else {}
-        # final fc
         out = self.final_fc(self.final_fusion(x))
 
         return out, out_aux
