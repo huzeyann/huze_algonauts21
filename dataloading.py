@@ -104,7 +104,7 @@ class AlgonautsDataset(Dataset):
                                            self.file_df['vid'].values,
                                            self.num_frames, self.resolution)
         if train:
-            if self.track == 'minitrack':
+            if self.track == 'mini_track':
                 self.fmris = wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
                                              self.file_df[self.roi].values)
             elif self.track == 'full_track':
