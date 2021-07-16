@@ -332,7 +332,7 @@ class Pyramid(nn.Module):
             'x1': np.array([[1, 2, 4], [1, 2, 4], [1, 2, 4]]),
             'x2': np.array([[1, 2, 4], [1, 2, 4], [1, 2, 4]]),
             'x3': np.array([[1, 1, 2], [1, 2, 3], [1, 2, 3]]),
-            'x4': np.array([[1, 1], [1, 2], [1, 2]]),
+            'x4': np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]]),
         }
         if self.is_pyramid:
             assert len(self.pathways) >= 1 and self.pathways[0] != 'none'
@@ -343,6 +343,9 @@ class Pyramid(nn.Module):
         self.fc_input_dims = {}
         self.first_fcs = nn.ModuleDict()
         self.aux_fcs = nn.ModuleDict()
+
+        self.debug_conv = nn.ModuleDict()
+        self.debug_conv.update({'x4': nn.Conv3d(2048, 256, kernel_size=1, stride=1)})
 
         for x_i in self.pyramid_layers:
             for pathway in self.pathways:
@@ -357,12 +360,16 @@ class Pyramid(nn.Module):
                     self.poolings.update({k: nn.Flatten()})
                     self.fc_input_dims.update({k: self.planes * np.product(self.twh_dict[x_i])})
                 elif self.pooling_modes[x_i] == 'avg':
-                    self.poolings.update({k: nn.AdaptiveAvgPool3d(1)})
+                    self.poolings.update({k: nn.Sequential(
+                        nn.AdaptiveAvgPool3d(1),
+                        nn.Flatten())})
                     self.fc_input_dims.update({k: self.planes})
                 elif self.pooling_modes[x_i] == 'spp':
-                    self.poolings.update({k: SpatialPyramidPooling(self.spp_level_dict[x_i],
-                                                                   hparams['pooling_mode'],
-                                                                   hparams['softpool'])})
+                    self.poolings.update({k: nn.Sequential(
+                        SpatialPyramidPooling(self.spp_level_dict[x_i],
+                                              hparams['pooling_mode'],
+                                              hparams['softpool']),
+                        nn.Flatten())})
                     self.fc_input_dims.update({k: np.sum(
                         self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][
                             2]) * self.planes})
@@ -390,13 +397,12 @@ class Pyramid(nn.Module):
     def forward(self, x):
         # drop x (clone for parallel path)
         x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
-        print(self.first_convs)
         x = {k: self.first_convs[k](v) for k, v in x.items()}
         if self.is_pyramid:
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
         x = {k: self.poolings[k](v) for k, v in x.items()}
         x = {k: self.first_fcs[k](v) for k, v in x.items()}
-        out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else {}
+        out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else None
         out = self.final_fc(self.final_fusion(x))
 
         return out, out_aux

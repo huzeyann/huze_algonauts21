@@ -18,10 +18,10 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts Mini V1',
+    project_name='Algonauts Mini V2',
     task_name='task template',
     tags=None,
-    reuse_last_task_id=True,
+    reuse_last_task_id=False,
     continue_last_task=False,
     output_uri=None,
     auto_connect_arg_parser=True,
@@ -123,10 +123,10 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--learning_rate', type=float, default=3e-4)
         parser.add_argument('--backbone_lr_ratio', type=float, default=0.1)
         parser.add_argument('--pooling_mode', type=str, default='avg')
-        parser.add_argument('--x1_pooling_mode', type=str, default='ssp')
-        parser.add_argument('--x2_pooling_mode', type=str, default='ssp')
-        parser.add_argument('--x3_pooling_mode', type=str, default='ssp')
-        parser.add_argument('--x4_pooling_mode', type=str, default='ssp')
+        parser.add_argument('--x1_pooling_mode', type=str, default='spp')
+        parser.add_argument('--x2_pooling_mode', type=str, default='spp')
+        parser.add_argument('--x3_pooling_mode', type=str, default='spp')
+        parser.add_argument('--x4_pooling_mode', type=str, default='spp')
         parser.add_argument('--fc_fusion', type=str, default='concat')
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
@@ -144,12 +144,24 @@ class LitI3DFC(LightningModule):
 
     def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
         x, y = batch
-        out = self(x)
+        out, out_aux = self(x)
         loss = F.mse_loss(out, y)
+        if out_aux is not None:
+            aux_losses = []
+            for k, oa in out_aux.items():
+                loss_aux = F.mse_loss(oa, y)
+                aux_losses.append(loss_aux)
+                if is_log:
+                    self.log(f'{prefix}_mse_loss/{k}', loss_aux,
+                             on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            loss_aux = torch.stack(aux_losses).sum() * self.hparams.aux_loss_weight
+        else:
+            loss_aux = 0
         if is_log:
-            self.log(f'{prefix}_mse_loss', loss,
+            self.log(f'{prefix}_mse_loss/final', loss,
                      on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-        return out, loss
+        all_loss = loss + loss_aux
+        return out, all_loss, out_aux
 
     # def training_step(self, batch, batch_idx):
     #     x, y = batch
@@ -167,7 +179,7 @@ class LitI3DFC(LightningModule):
 
         optimizer = self.optimizers()
 
-        out, loss = self._shared_train_val(batch, batch_idx, 'train')
+        out, loss, _ = self._shared_train_val(batch, batch_idx, 'train')
         self.manual_backward(loss)  # take care fp16
 
         if self.hparams.asm:
@@ -185,10 +197,10 @@ class LitI3DFC(LightningModule):
             optimizer.step()
 
     def validation_step(self, batch, batch_idx):
-        out, loss = self._shared_train_val(batch, batch_idx, 'val')
+        out, loss, out_aux = self._shared_train_val(batch, batch_idx, 'val')
         y = batch[-1]
         # self.val_corr(out[:, 0], y[:, 0])
-        return {'out': out, 'y': y}
+        return {'out': out, 'y': y, 'out_aux': out_aux}
 
     def validation_epoch_end(self, val_step_outputs) -> None:
         # print("hello there")
@@ -198,7 +210,19 @@ class LitI3DFC(LightningModule):
         val_outs = torch.cat([out['out'] for out in val_step_outputs], 0)
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
         val_corr = vectorized_correlation(val_outs, val_ys).mean()
-        self.log('val_corr', val_corr, prog_bar=True, logger=True, sync_dist=True)
+        self.log('val_corr/final', val_corr, prog_bar=True, logger=True, sync_dist=True)
+
+        # aux
+        keys = val_step_outputs[0]['out_aux'].keys()
+        for k in keys:
+            outs = []
+            for i, val_step_output in enumerate(val_step_outputs):
+                out_aux = val_step_output['out_aux']
+                outs.append(out_aux[k])
+            outs = torch.cat(outs, 0)
+            aux_val_corr = vectorized_correlation(outs, val_ys).mean()
+            self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
+
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
@@ -285,7 +309,7 @@ if __name__ == '__main__':
     hparams['output_size'] = dm.num_voxels
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_corr',
+        monitor='val_corr/final',
         dirpath='/home/huze/.cache/checkpoints',
         filename='MiniFC-{epoch:02d}-{val_corr:.6f}',
         save_weights_only=True,
@@ -294,7 +318,7 @@ if __name__ == '__main__':
     )
 
     early_stop_callback = EarlyStopping(
-        monitor='val_corr',
+        monitor='val_corr/final',
         min_delta=0.00,
         patience=int(args.early_stop_epochs/args.val_check_interval),
         verbose=False,
