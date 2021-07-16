@@ -56,7 +56,7 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/fc_fusion'] = 'concat'
         cloned_task_parameters['Args/pyramid_layers'] = 'x1,x2,x3,x4'
         cloned_task_parameters['Args/pathways'] = 'topdown'
-        cloned_task_parameters['Args/aux_loss_weight'] = '0.25'
+        cloned_task_parameters['Args/aux_loss_weight'] = '0.5'
         cloned_task_parameters['Args/save_checkpoints'] = False
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_x2_{pooling_sch}/'
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
