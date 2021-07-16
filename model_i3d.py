@@ -307,7 +307,7 @@ class Pyramid(nn.Module):
 
     def __init__(self, hparams):
         super(Pyramid, self).__init__()
-        assert hparams.fc_fusion in ['concat', 'add', 'avg']
+        assert hparams['fc_fusion'] in ['concat', 'add', 'avg']
         self.hparams = hparams
         self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
         self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
@@ -374,16 +374,16 @@ class Pyramid(nn.Module):
                 self.aux_fcs.update({k: build_fc(
                     hparams, self.fc_input_dims[k], hparams['output_size'], part='last')})
 
-        if hparams.fc_fusion == 'concat':
+        if hparams['fc_fusion'] == 'concat':
             final_in_dim = hparams['layer_hidden'] * \
                            len(self.pathways) * \
                            len(self.pyramid_layers)
-        elif hparams.fc_fusion == 'add' or hparams.fc_fusion == 'avg':
+        elif hparams['fc_fusion'] == 'add' or hparams['fc_fusion'] == 'avg':
             final_in_dim = hparams['layer_hidden']
         else:
             NotImplementedError()
 
-        self.final_fusion = FcFusion(fusion_type=hparams.fc_fusion)
+        self.final_fusion = FcFusion(fusion_type=hparams['fc_fusion'])
         hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
         self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
 
