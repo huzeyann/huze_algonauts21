@@ -390,6 +390,7 @@ class Pyramid(nn.Module):
     def forward(self, x):
         # drop x (clone for parallel path)
         x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
+        print(self.first_convs)
         x = {k: self.first_convs[k](v) for k, v in x.items()}
         if self.is_pyramid:
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
