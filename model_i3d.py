@@ -347,8 +347,7 @@ class Pyramid(nn.Module):
         for x_i in self.pyramid_layers:
             for pathway in self.pathways:
                 k = f'{pathway}_{x_i}'
-                self.first_convs.update(nn.ModuleDict(
-                    {k: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)}))
+                self.first_convs.update({k: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)})
 
                 if self.is_pyramid:
                     self.smooths.update(
@@ -390,7 +389,7 @@ class Pyramid(nn.Module):
 
     def forward(self, x):
         # drop x (clone for parallel path)
-        x = {f'{pathway}_{x_i}': x[x_i].clone() for x_i in self.pyramid_layers for pathway in self.pathways}
+        x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
         x = {k: self.first_convs[k](v) for k, v in x.items()}
         if self.is_pyramid:
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
