@@ -319,7 +319,7 @@ class Pyramid(nn.Module):
         self.planes = hparams['conv_size']
         self.pyramid_layers = hparams['pyramid_layers'].split(',')  # x1,x2,x3,x4
         self.pyramid_layers.sort()
-        self.pathways = hparams['pathways'].split(',')  # ['topdown', 'bottomup'] aka 'parallel'
+        self.pathways = hparams['pathways'].split(',')  # ['topdown', 'bottomup'] aka 'parallel', or "none"
         self.is_pyramid = False if self.pathways[0] == 'none' else True
         self.aux_heads = True if hparams['aux_loss_weight'] > 0 else False
         self.pooling_modes = {  # pooling_mode in ['no', 'spp', 'avg']

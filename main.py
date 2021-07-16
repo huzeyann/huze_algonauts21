@@ -107,7 +107,7 @@ class LitI3DFC(LightningModule):
         # self.backbone = nn.SyncBatchNorm.convert_sync_batchnorm(backbone) # slooooow
 
         if self.hparams.backbone_type == 'all':
-            self.neck = ...
+            self.neck = Pyramid(hparams)
         else:
             self.neck = MiniFC(hparams)
 
@@ -123,6 +123,15 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--learning_rate', type=float, default=3e-4)
         parser.add_argument('--backbone_lr_ratio', type=float, default=0.1)
         parser.add_argument('--pooling_mode', type=str, default='avg')
+        parser.add_argument('--x1_pooling_mode', type=str, default='ssp')
+        parser.add_argument('--x2_pooling_mode', type=str, default='ssp')
+        parser.add_argument('--x3_pooling_mode', type=str, default='ssp')
+        parser.add_argument('--x4_pooling_mode', type=str, default='ssp')
+        parser.add_argument('--fc_fusion', type=str, default='concat')
+        parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
+        parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
+        parser.add_argument('--aux_loss_weight', type=float, default=0.25)
+        # legacy
         parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")
         parser.add_argument('--global_pooling', default=False, action="store_true")
