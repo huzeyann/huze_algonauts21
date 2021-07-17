@@ -359,11 +359,13 @@ if __name__ == '__main__':
     else:
         NotImplementedError()
 
+    print(hparams)
     plmodel = LitI3DFC(backbone, hparams)
 
     # trainer.tune(plmodel, datamodule=dm)
     trainer.fit(plmodel, dm)
 
+    print(hparams)
     if args.save_checkpoints:
         plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
         prediction = trainer.predict(plmodel, datamodule=dm)

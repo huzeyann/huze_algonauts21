@@ -391,7 +391,7 @@ class Pyramid(nn.Module):
             NotImplementedError()
 
         self.final_fusion = FcFusion(fusion_type=hparams['fc_fusion'])
-        hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
+        # hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
         self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
 
     def forward(self, x):

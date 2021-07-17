@@ -12,7 +12,8 @@ task = Task.init(project_name=PROJECT_NAME,
 template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
-rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
+# rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
+rois = ['LOC', 'V2']
 
 available_devices = {
     '16': [0, 1],
@@ -46,7 +47,7 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/conv_size'] = 256
         cloned_task_parameters['Args/layer_hidden'] = 2048
         cloned_task_parameters['Args/debug'] = False
-        cloned_task_parameters['Args/early_stop_epochs'] = 15
+        cloned_task_parameters['Args/early_stop_epochs'] = 10
         cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
         cloned_task_parameters['Args/x1_pooling_mode'] = pooling_sch
         cloned_task_parameters['Args/x2_pooling_mode'] = pooling_sch
@@ -56,8 +57,8 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/fc_fusion'] = 'concat'
         cloned_task_parameters['Args/pyramid_layers'] = layers
         cloned_task_parameters['Args/pathways'] = 'topdown'
-        cloned_task_parameters['Args/aux_loss_weight'] = 0.5
-        cloned_task_parameters['Args/val_check_interval'] = 0.25
+        cloned_task_parameters['Args/aux_loss_weight'] = 0.25
+        cloned_task_parameters['Args/val_check_interval'] = 0.5
         cloned_task_parameters['Args/save_checkpoints'] = True
         cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v2_pyramid_{pooling_sch}_{layers}/'
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
@@ -94,7 +95,7 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/conv_size'] = 256
         cloned_task_parameters['Args/layer_hidden'] = 2048
         cloned_task_parameters['Args/debug'] = False
-        cloned_task_parameters['Args/early_stop_epochs'] = 15
+        cloned_task_parameters['Args/early_stop_epochs'] = 10
         cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
         cloned_task_parameters['Args/x1_pooling_mode'] = pooling_sch
         cloned_task_parameters['Args/x2_pooling_mode'] = pooling_sch
@@ -105,7 +106,7 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/pyramid_layers'] = layers
         cloned_task_parameters['Args/pathways'] = 'topdown'
         cloned_task_parameters['Args/aux_loss_weight'] = 0.5
-        cloned_task_parameters['Args/val_check_interval'] = 0.25
+        cloned_task_parameters['Args/val_check_interval'] = 0.5
         cloned_task_parameters['Args/save_checkpoints'] = True
         cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v2_pyramid_{pooling_sch}_{layers}/'
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
