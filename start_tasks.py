@@ -15,7 +15,7 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
 rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
 
 available_devices = {
-    '16': [0],
+    '16': [0, 1],
 }
 
 queue_names = []
@@ -57,6 +57,7 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/pyramid_layers'] = 'x1,x2,x3,x4'
         cloned_task_parameters['Args/pathways'] = 'topdown'
         cloned_task_parameters['Args/aux_loss_weight'] = 0.5
+        cloned_task_parameters['Args/val_check_interval'] = 0.25
         cloned_task_parameters['Args/save_checkpoints'] = True
         cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v2_pyramid_{pooling_sch}/'
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
