@@ -329,8 +329,8 @@ class Pyramid(nn.Module):
             'x4': hparams['x4_pooling_mode'],
         }
         self.spp_level_dict = {
-            'x1': np.array([[1, 2], [1, 4], [1, 4]]),
-            'x2': np.array([[1, 2], [1, 4], [1, 4]]),
+            'x1': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
+            'x2': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
             'x3': np.array([[2, 2, 2], [1, 3, 5], [1, 3, 5]]),
             'x4': np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]]),
         }
