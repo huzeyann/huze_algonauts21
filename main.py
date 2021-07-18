@@ -18,7 +18,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts Mini V2',
+    project_name='Algonauts V2',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -29,43 +29,6 @@ task = Task.init(
     auto_resource_monitoring=True,
     auto_connect_streams=True,
 )
-
-
-def _pearson_corrcoef_compute(preds: Tensor, target: Tensor, eps: float = 1e-6) -> Tensor:
-    """ computes the final pearson correlation based on covariance matrix and number of observatiosn """
-    dim = 1
-    preds_diff = preds - preds.mean(dim)
-    target_diff = target - target.mean(dim)
-
-    cov = (preds_diff * target_diff).mean(dim)
-    preds_std = torch.sqrt((preds_diff * preds_diff).mean(dim))
-    target_std = torch.sqrt((target_diff * target_diff).mean(dim))
-
-    denom = preds_std * target_std
-    # prevent division by zero
-    if denom == 0:
-        denom += eps
-
-    corrcoef = cov / denom
-    return torch.clamp(corrcoef, -1.0, 1.0)
-
-
-def vectorized_correlation(x, y):
-    dim = 0
-
-    centered_x = x - x.mean(dim, keepdims=True)
-    centered_y = y - y.mean(dim, keepdims=True)
-
-    covariance = (centered_x * centered_y).sum(dim, keepdims=True)
-
-    bessel_corrected_covariance = covariance / (x.shape[dim] - 1)
-
-    x_std = x.std(dim, keepdims=True) + 1e-8
-    y_std = y.std(dim, keepdims=True) + 1e-8
-
-    corr = bessel_corrected_covariance / (x_std * y_std)
-
-    return corr.ravel()
 
 
 class DataAugmentation(nn.Module):
@@ -223,7 +186,6 @@ class LitI3DFC(LightningModule):
             aux_val_corr = vectorized_correlation(outs, val_ys).mean()
             self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
-
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
         no_decay = ["bias", "BatchNorm3D.weight", "BatchNorm1D.weight", "BatchNorm2D.weight"]
@@ -280,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument('--video_size', type=int, default=288)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--max_epochs', type=int, default=300)
-    parser.add_argument('--datasets_dir', type=str, default='/data_smr/huze/projects/my_algonauts/datasets/')
+    parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
     parser.add_argument('--backbone_type', type=str, default='x3')
     parser.add_argument('--roi', type=str, default="EBA")
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
@@ -294,9 +256,8 @@ if __name__ == '__main__':
     parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--asm", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true")
-    parser.add_argument('--predictions_dir', type=str, default='/home/huze/.cache/predictions/v1/')
+    parser.add_argument('--predictions_dir', type=str, default='/home/huze/.cache/predictions/debug/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
-
 
     parser = LitI3DFC.add_model_specific_args(parser)
     args = parser.parse_args()
@@ -320,7 +281,7 @@ if __name__ == '__main__':
     early_stop_callback = EarlyStopping(
         monitor='val_corr/final',
         min_delta=0.00,
-        patience=int(args.early_stop_epochs/args.val_check_interval),
+        patience=int(args.early_stop_epochs / args.val_check_interval),
         verbose=False,
         mode='max'
     )
@@ -359,13 +320,11 @@ if __name__ == '__main__':
     else:
         NotImplementedError()
 
-    print(hparams)
     plmodel = LitI3DFC(backbone, hparams)
 
     # trainer.tune(plmodel, datamodule=dm)
     trainer.fit(plmodel, dm)
 
-    print(hparams)
     if args.save_checkpoints:
         plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
         prediction = trainer.predict(plmodel, datamodule=dm)

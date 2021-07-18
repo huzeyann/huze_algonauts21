@@ -13,7 +13,6 @@ import glob
 import torch
 from tqdm import tqdm
 
-
 def vectorized_correlation(x, y):
     dim = 0
 
