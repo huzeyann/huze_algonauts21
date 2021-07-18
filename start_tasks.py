@@ -91,7 +91,7 @@ for pooling_sch in pooling_schs:
         # cloned_task_parameters['rois'] = [roi]
         cloned_task_parameters['Args/roi'] = roi
         # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
-        cloned_task_parameters['Args/batch_size'] = 24
+        cloned_task_parameters['Args/batch_size'] = 16
         cloned_task_parameters['Args/conv_size'] = 256
         cloned_task_parameters['Args/layer_hidden'] = 2048
         cloned_task_parameters['Args/debug'] = False
