@@ -275,7 +275,7 @@ if __name__ == '__main__':
         dirpath='/home/huze/.cache/checkpoints',
         filename='MiniFC-{epoch:02d}-{val_corr:.6f}',
         save_weights_only=True,
-        save_top_k=2,
+        save_top_k=1,
         mode='max',
     )
 
