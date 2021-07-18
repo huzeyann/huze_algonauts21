@@ -2,7 +2,7 @@ import itertools
 
 from clearml import Task
 
-PROJECT_NAME = 'Algonauts Mini V2'
+PROJECT_NAME = 'Algonauts V2'
 BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
@@ -68,10 +68,10 @@ for pathway in pathways:
         cloned_task.set_parameters(cloned_task_parameters)
         print('Experiment set with parameters {}'.format(cloned_task_parameters))
 
-    # enqueue the task for execution
-    Task.enqueue(cloned_task.id, queue_name=queue)
-    print('Experiment id={} enqueue for execution'.format(cloned_task.id))
+        # enqueue the task for execution
+        Task.enqueue(cloned_task.id, queue_name=queue)
+        print('Experiment id={} enqueue for execution'.format(cloned_task.id))
 
-    task_ids.append(cloned_task.id)
+        task_ids.append(cloned_task.id)
 
 print(task_ids)
