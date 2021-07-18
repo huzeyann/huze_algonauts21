@@ -176,15 +176,16 @@ class LitI3DFC(LightningModule):
         self.log('val_corr/final', val_corr, prog_bar=True, logger=True, sync_dist=True)
 
         # aux
-        keys = val_step_outputs[0]['out_aux'].keys()
-        for k in keys:
-            outs = []
-            for i, val_step_output in enumerate(val_step_outputs):
-                out_aux = val_step_output['out_aux']
-                outs.append(out_aux[k])
-            outs = torch.cat(outs, 0)
-            aux_val_corr = vectorized_correlation(outs, val_ys).mean()
-            self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
+        if val_step_outputs[0]['out_aux'] is not None:
+            keys = val_step_outputs[0]['out_aux'].keys()
+            for k in keys:
+                outs = []
+                for i, val_step_output in enumerate(val_step_outputs):
+                    out_aux = val_step_output['out_aux']
+                    outs.append(out_aux[k])
+                outs = torch.cat(outs, 0)
+                aux_val_corr = vectorized_correlation(outs, val_ys).mean()
+                self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
