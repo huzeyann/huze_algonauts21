@@ -113,6 +113,7 @@ for pooling_sch in pooling_schs:
             cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
             # cloned_task_parameters['Args/x1_pooling_mode'] = 'spp'
             # cloned_task_parameters['Args/x2_pooling_mode'] = 'spp'
+            cloned_task_parameters['Args/x2_pooling_mode'] = pooling_sch["x2"]
             cloned_task_parameters['Args/x3_pooling_mode'] = pooling_sch["x3"]
             cloned_task_parameters['Args/x4_pooling_mode'] = pooling_sch["x4"]
             cloned_task_parameters['Args/backbone_type'] = 'all'
