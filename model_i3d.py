@@ -331,8 +331,8 @@ class Pyramid(nn.Module):
         self.spp_level_dict = {
             'x1': np.array([[1, 2], [1, 4], [1, 4]]),
             'x2': np.array([[1, 2], [1, 4], [1, 4]]),
-            'x3': np.array([[1, 2], [1, 3], [1, 3]]),
-            'x4': np.array([[1, 1], [1, 3], [1, 3]]),
+            'x3': np.array([[2, 2, 2], [1, 3, 5], [1, 3, 5]]),
+            'x4': np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]]),
         }
         if self.is_pyramid:
             assert len(self.pathways) >= 1 and self.pathways[0] != 'none'

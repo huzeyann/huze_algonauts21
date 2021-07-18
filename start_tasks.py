@@ -28,7 +28,7 @@ queues_buffer = itertools.cycle(queue_names)
 task_ids = []
 
 pathways = ['topdown', 'none']
-layers = 'x1,x2,x3,x4'
+layers = 'x3,x4'
 for pathway in pathways:
     for roi in rois:
         queue = next(queues_buffer)
@@ -65,6 +65,7 @@ for pathway in pathways:
         # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
 
         # put back into the new cloned task
+
         cloned_task.set_parameters(cloned_task_parameters)
         print('Experiment set with parameters {}'.format(cloned_task_parameters))
 
