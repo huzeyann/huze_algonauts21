@@ -12,8 +12,8 @@ task = Task.init(project_name=PROJECT_NAME,
 template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
-# rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
-rois = ['LOC', 'V2']
+rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
+# rois = ['LOC', 'V2']
 
 available_devices = {
     '16': [0, 1],
@@ -85,7 +85,7 @@ for pooling_sch in pooling_schs:
                                  name=template_task.name + f' {roi} {pooling_sch}',
                                  parent=template_task.id)
 
-        cloned_task.add_tags([roi, pooling_sch, 'pyramid', layers])
+        cloned_task.add_tags([roi, 'no,avg', 'pyramid', layers])
 
         cloned_task_parameters = cloned_task.get_parameters()
         # cloned_task_parameters['rois'] = [roi]
@@ -100,7 +100,7 @@ for pooling_sch in pooling_schs:
         cloned_task_parameters['Args/x1_pooling_mode'] = pooling_sch
         cloned_task_parameters['Args/x2_pooling_mode'] = pooling_sch
         cloned_task_parameters['Args/x3_pooling_mode'] = pooling_sch
-        cloned_task_parameters['Args/x4_pooling_mode'] = pooling_sch
+        cloned_task_parameters['Args/x4_pooling_mode'] = 'avg'
         cloned_task_parameters['Args/backbone_type'] = 'all'
         cloned_task_parameters['Args/fc_fusion'] = 'concat'
         cloned_task_parameters['Args/pyramid_layers'] = layers
