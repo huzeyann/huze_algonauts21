@@ -55,7 +55,7 @@ for pooling_sch in pooling_schs:
             cloned_task_parameters['Args/conv_size'] = 256
             cloned_task_parameters['Args/layer_hidden'] = 2048
             cloned_task_parameters['Args/debug'] = False
-            cloned_task_parameters['Args/early_stop_epochs'] = 5
+            cloned_task_parameters['Args/early_stop_epochs'] = 10
             cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
             # cloned_task_parameters['Args/x1_pooling_mode'] = 'spp'
             # cloned_task_parameters['Args/x2_pooling_mode'] = 'spp'
