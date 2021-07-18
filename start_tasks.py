@@ -16,7 +16,7 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
 rois = ['LOC', 'V2']
 
 available_devices = {
-    '16': [0, 1],
+    '16': [0],
 }
 
 queue_names = []
