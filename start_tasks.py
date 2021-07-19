@@ -81,8 +81,8 @@ task_ids = []
 #             task_ids.append(cloned_task.id)
 
 pathways = ['topdown', 'none']
-pooling_schs = [{'x2': 'spp', 'x3': 'spp', 'x4': 'spp'},
-                {'x2': 'spp', 'x3': 'spp', 'x4': 'avg'}]
+pooling_schs = [{'x2': 'spp', 'x3': 'no', 'x4': 'avg'}]
+# {'x2': 'spp', 'x3': 'spp', 'x4': 'spp'}
 layers = 'x2,x3,x4'
 for pooling_sch in pooling_schs:
     for roi in rois:
