@@ -12,7 +12,7 @@ from PIL import Image
 import glob
 import torch
 from tqdm import tqdm
-
+from torch import nn
 
 def disable_bn(model):
     for module in model.modules():
