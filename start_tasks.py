@@ -85,8 +85,9 @@ pooling_schs = [{'x2': 'spp', 'x3': 'no', 'x4': 'avg'},
                 {'x2': 'spp', 'x3': 'spp', 'x4': 'spp'}]
 layers = 'x2,x3,x4'
 for pooling_sch in pooling_schs:
-    for roi in rois:
-        for pathway in pathways:
+    for pathway in pathways:
+        for roi in rois:
+
             queue = next(queues_buffer)
 
             cloned_task = Task.clone(source_task=template_task,
@@ -102,7 +103,7 @@ for pooling_sch in pooling_schs:
             # cloned_task_parameters['rois'] = [roi]
             cloned_task_parameters['Args/roi'] = roi
             # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
-            cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch["x3"] != 'no' else 16
+            cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch["x3"] != 'no' else 24
             cloned_task_parameters['Args/num_layers'] = 1
             cloned_task_parameters['Args/conv_size'] = 256
             cloned_task_parameters['Args/layer_hidden'] = 2048
@@ -119,7 +120,7 @@ for pooling_sch in pooling_schs:
             cloned_task_parameters['Args/pyramid_layers'] = layers
             cloned_task_parameters['Args/pathways'] = pathway
             cloned_task_parameters['Args/aux_loss_weight'] = 0.0
-            cloned_task_parameters['Args/val_check_interval'] = 0.5 if pooling_sch["x3"] != 'no' else 0.25
+            cloned_task_parameters['Args/val_check_interval'] = 0.5 if pooling_sch["x3"] != 'no' else 0.5
             cloned_task_parameters['Args/save_checkpoints'] = True
             cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/{cloned_task.id}/'
             # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
