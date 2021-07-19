@@ -108,6 +108,7 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--sample_voxels', default=False, action="store_true")
         parser.add_argument('--sample_num_voxels', type=int, default=1000)
         parser.add_argument('--freeze_bn', default=False, action="store_true")
+        parser.add_argument('--convtrans_bn', default=False, action="store_true")
         # legacy
         parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")

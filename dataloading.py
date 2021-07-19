@@ -145,7 +145,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
         self.roi = roi
         self.datasets_dir = datasets_dir
         self.train_full_len = 1000
-        self.file_list = ['train_val.csv', 'predict.csv', 'config.json']
+        self.file_list = ['train_val.csv', 'predict.csv']
         self.file_list = [os.path.join(self.datasets_dir, f) for f in self.file_list]
         self.batch_size = batch_size
 

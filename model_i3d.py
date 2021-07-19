@@ -308,17 +308,32 @@ class ConvResponseModel(nn.Module):
     def __init__(self, in_dim, out_dim, hparams):
         super(ConvResponseModel, self).__init__()
         self.fc = nn.Sequential(nn.Linear(in_dim, 1024 * 4 * 5 * 4), nn.ELU())
-        self.convt = nn.Sequential(
-            nn.ConvTranspose3d(1024, 512, (3, 3, 3), (2, 2, 2)),
-            nn.ELU(),
-            nn.ConvTranspose3d(512, 256, (3, 3, 3), (2, 2, 2)),
-            nn.ELU(),
-            nn.ConvTranspose3d(256, 128, (3, 3, 3), (2, 2, 2)),
-            nn.ELU(),
-            nn.ConvTranspose3d(128, out_dim, (3, 3, 3), (2, 2, 2)),
-            nn.ELU()
-        )
-
+        if hparams['convtrans_bn']:
+            self.convt = nn.Sequential(
+                nn.ConvTranspose3d(1024, 512, (3, 3, 3), (2, 2, 2)),
+                nn.BatchNorm3d(512),
+                nn.ELU(),
+                nn.ConvTranspose3d(512, 256, (3, 3, 3), (2, 2, 2)),
+                nn.BatchNorm3d(256),
+                nn.ELU(),
+                nn.ConvTranspose3d(256, 128, (3, 3, 3), (2, 2, 2)),
+                nn.BatchNorm3d(128),
+                nn.ELU(),
+                nn.ConvTranspose3d(128, out_dim, (3, 3, 3), (2, 2, 2)),
+            )
+        else:
+            self.convt = nn.Sequential(
+                nn.ConvTranspose3d(1024, 512, (3, 3, 3), (2, 2, 2)),
+                # nn.BatchNorm3d(512),
+                nn.ELU(),
+                nn.ConvTranspose3d(512, 256, (3, 3, 3), (2, 2, 2)),
+                # nn.BatchNorm3d(256),
+                nn.ELU(),
+                nn.ConvTranspose3d(256, 128, (3, 3, 3), (2, 2, 2)),
+                # nn.BatchNorm3d(128),
+                nn.ELU(),
+                nn.ConvTranspose3d(128, out_dim, (3, 3, 3), (2, 2, 2)),
+            )
     def forward(self, x):
         x = self.fc(x)
         x = x.reshape(x.shape[0], 1024, 4, 5, 4)
