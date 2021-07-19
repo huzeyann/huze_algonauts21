@@ -78,7 +78,7 @@ class LitI3DFC(LightningModule):
             subs = [f'sub{i + 1:02d}' for i in range(10)] if self.hparams.subs == 'all' else self.hparams.subs
             voxel_masks = []
             for sub in subs:
-                voxel_mask = np.load(os.path.join(hparams['dataset_dir'], 'fmris', f'{sub}_voxel_mask.npy'))
+                voxel_mask = np.load(os.path.join(hparams['datasets_dir'], 'fmris', f'{sub}_voxel_mask.npy'))
                 voxel_mask = torch.tensor(voxel_mask, device=self.device)
                 voxel_mask = F.pad(voxel_mask, (4, 4, 1, 1, 0, 1))
                 voxel_masks.append(voxel_mask)
