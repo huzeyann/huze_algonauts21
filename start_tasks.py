@@ -12,8 +12,8 @@ task = Task.init(project_name=PROJECT_NAME,
 template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
-rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
-# rois = ['LOC']
+# rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
+rois = ['V1', 'LOC']
 
 available_devices = {
     '16': [0, 1],
@@ -81,8 +81,8 @@ task_ids = []
 #             task_ids.append(cloned_task.id)
 
 pathways = ['topdown', 'none']
-pooling_schs = [{'x2': 'spp', 'x3': 'no', 'x4': 'avg'}]
-# {'x2': 'spp', 'x3': 'spp', 'x4': 'spp'}
+pooling_schs = [{'x2': 'spp', 'x3': 'no', 'x4': 'avg'},
+                {'x2': 'spp', 'x3': 'spp', 'x4': 'spp'}]
 layers = 'x2,x3,x4'
 for pooling_sch in pooling_schs:
     for roi in rois:
@@ -134,7 +134,6 @@ for pooling_sch in pooling_schs:
             print('Experiment id={} enqueue for execution'.format(cloned_task.id))
 
             task_ids.append(cloned_task.id)
-
 
 # pathways = ['topdown', 'none']
 # pooling_schs = [{'x3': 'avg', 'x4': 'avg'},
