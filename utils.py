@@ -13,6 +13,12 @@ import glob
 import torch
 from tqdm import tqdm
 
+
+def disable_bn(model):
+    for module in model.modules():
+        if isinstance(module, nn.BatchNorm3d):
+            module.eval()
+
 def vectorized_correlation(x, y):
     dim = 0
 

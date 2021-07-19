@@ -303,6 +303,29 @@ class FcFusion(nn.Module):
         return out
 
 
+class ConvResponseModel(nn.Module):
+
+    def __init__(self, in_dim, out_dim, hparams):
+        super(ConvResponseModel, self).__init__()
+        self.fc = nn.Sequential(nn.Linear(in_dim, 1024 * 4 * 5 * 4), nn.ELU())
+        self.convt = nn.Sequential(
+            nn.ConvTranspose3d(1024, 512, (3, 3, 3), (2, 2, 2)),
+            nn.ELU(),
+            nn.ConvTranspose3d(512, 256, (3, 3, 3), (2, 2, 2)),
+            nn.ELU(),
+            nn.ConvTranspose3d(256, 128, (3, 3, 3), (2, 2, 2)),
+            nn.ELU(),
+            nn.ConvTranspose3d(128, out_dim, (3, 3, 3), (2, 2, 2)),
+            nn.ELU()
+        )
+
+    def forward(self, x):
+        x = self.fc(x)
+        x = x.reshape(x.shape[0], 1024, 4, 5, 4)
+        x = self.convt(x)
+        return x
+
+
 class Pyramid(nn.Module):
 
     def __init__(self, hparams):
@@ -378,8 +401,9 @@ class Pyramid(nn.Module):
 
                 self.first_fcs.update({k: build_fc(
                     hparams, self.fc_input_dims[k], hparams['output_size'], part='first')})
-                self.aux_fcs.update({k: build_fc(
-                    hparams, self.fc_input_dims[k], hparams['output_size'], part='last')})
+                if self.aux_heads:
+                    self.aux_fcs.update({k: build_fc(
+                        hparams, self.fc_input_dims[k], hparams['output_size'], part='last')})
 
         if hparams['fc_fusion'] == 'concat':
             final_in_dim = hparams['layer_hidden'] * \
@@ -392,7 +416,10 @@ class Pyramid(nn.Module):
 
         self.final_fusion = FcFusion(fusion_type=hparams['fc_fusion'])
         # hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
-        self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
+        if self.hparams['track'] == 'mini_track':
+            self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
+        elif self.hparams['track'] == 'full_track':
+            self.conv_response = ConvResponseModel(final_in_dim, hparams['num_subs'], hparams)
 
     def forward(self, x):
         # drop x (clone for parallel path)
@@ -402,10 +429,14 @@ class Pyramid(nn.Module):
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
         x = {k: self.poolings[k](v) for k, v in x.items()}
         x = {k: self.first_fcs[k](v) for k, v in x.items()}
-        out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else None
-        out = self.final_fc(self.final_fusion(x))
+        if self.hparams['track'] == 'mini_track':
+            out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else None
+            out = self.final_fc(self.final_fusion(x))
+            return out, out_aux
 
-        return out, out_aux
+        elif self.hparams['track'] == 'full_track':
+            out = self.conv_response(self.final_fusion(x))
+            return out
 
     def pyramid_pathway(self, x, layers, pathways):
         for pathway in pathways:

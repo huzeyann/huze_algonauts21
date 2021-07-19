@@ -74,6 +74,17 @@ class LitI3DFC(LightningModule):
         else:
             self.neck = MiniFC(hparams)
 
+        if self.hparams.track == 'full_track':
+            subs = [f'sub{i + 1:02d}' for i in range(10)] if self.hparams.subs == 'all' else self.hparams.subs
+            voxel_masks = []
+            for sub in subs:
+                voxel_mask = np.load(os.path.join(hparams['dataset_dir'], 'fmris', f'{sub}_voxel_mask.npy'))
+                voxel_mask = torch.tensor(voxel_mask, device=self.device)
+                voxel_mask = F.pad(voxel_mask, (4, 4, 1, 1, 0, 1))
+                voxel_masks.append(voxel_mask)
+            print('voxel_mask in ', self.device)
+            self.voxel_masks = torch.stack(voxel_masks, 0)
+
     @staticmethod
     def add_model_specific_args(parser):
         parser.add_argument_group("LitModel")
@@ -94,6 +105,8 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.25)
+        parser.add_argument('--sample_voxels', default=False, action="store_true")
+        parser.add_argument('--freeze_bn', default=False, action="store_true")
         # legacy
         parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")
@@ -107,24 +120,39 @@ class LitI3DFC(LightningModule):
 
     def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
         x, y = batch
-        out, out_aux = self(x)
-        loss = F.mse_loss(out, y)
-        if out_aux is not None:
-            aux_losses = []
-            for k, oa in out_aux.items():
-                loss_aux = F.mse_loss(oa, y)
-                aux_losses.append(loss_aux)
-                if is_log:
-                    self.log(f'{prefix}_mse_loss/{k}', loss_aux,
-                             on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            loss_aux = torch.stack(aux_losses).sum() * self.hparams.aux_loss_weight
-        else:
-            loss_aux = 0
-        if is_log:
-            self.log(f'{prefix}_mse_loss/final', loss,
-                     on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-        all_loss = loss + loss_aux
-        return out, all_loss, out_aux
+        if self.hparams['track'] == 'mini_track':
+            out, out_aux = self(x)
+            loss = F.mse_loss(out, y)
+            if out_aux is not None:
+                aux_losses = []
+                for k, oa in out_aux.items():
+                    loss_aux = F.mse_loss(oa, y)
+                    aux_losses.append(loss_aux)
+                    if is_log:
+                        self.log(f'{prefix}_mse_loss/{k}', loss_aux,
+                                 on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                loss_aux = torch.stack(aux_losses).sum() * self.hparams.aux_loss_weight
+            else:
+                loss_aux = 0
+            if is_log:
+                self.log(f'{prefix}_mse_loss/final', loss,
+                         on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            all_loss = loss + loss_aux
+            return out, all_loss, out_aux
+        elif self.hparams.track == 'full_track':
+            out = self(x)
+            out_voxels = out[self.voxel_masks.unsqueeze(0).expand(out.size()) == 1].reshape(out.shape[0], -1)
+            if self.hparams.sample_voxels:
+                mask = torch.rand(out_voxels.shape[1]).unsqueeze(0).expand(out_voxels.size())
+                masked_out_voxels = out_voxels[mask > 0.5]
+                masked_y = y[mask > 0.5]
+                loss = F.mse_loss(masked_out_voxels, masked_y)
+            else:
+                loss = F.mse_loss(out_voxels, y)
+            if is_log:
+                self.log(f'{prefix}_mse_loss/final', loss,
+                         on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            return out_voxels, loss, None
 
     # def training_step(self, batch, batch_idx):
     #     x, y = batch
@@ -136,21 +164,18 @@ class LitI3DFC(LightningModule):
 
     def training_step(self, batch, batch_idx):
         self.train()
+        if self.hparams.freeze_bn:
+            self.backbone.apply(disable_bn)
         x, y = batch
         x = self.train_transform(x) if self.train_transform is not None else x
         batch = (x, y)
 
-        optimizer = self.optimizers()
-
         out, loss, _ = self._shared_train_val(batch, batch_idx, 'train')
         self.manual_backward(loss)  # take care fp16
 
-        if self.hparams.asm:
-            def disable_bn(model):
-                for module in model.modules():
-                    if isinstance(module, nn.BatchNorm3d):
-                        module.eval()
+        optimizer = self.optimizers()
 
+        if self.hparams.asm:
             optimizer.first_step(zero_grad=True)
             self.backbone.apply(disable_bn)
             out, loss = self._shared_train_val(batch, batch_idx, 'train', is_log=False)
@@ -175,7 +200,7 @@ class LitI3DFC(LightningModule):
         val_corr = vectorized_correlation(val_outs, val_ys).mean()
         self.log('val_corr/final', val_corr, prog_bar=True, logger=True, sync_dist=True)
 
-        # aux
+        # aux heads
         if val_step_outputs[0]['out_aux'] is not None:
             keys = val_step_outputs[0]['out_aux'].keys()
             for k in keys:
@@ -244,8 +269,11 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
+    parser.add_argument('--track', type=str, default='mini_track')
     parser.add_argument('--backbone_type', type=str, default='x3')
     parser.add_argument('--roi', type=str, default="EBA")
+    parser.add_argument('--subs', type=str, default="all")
+    parser.add_argument('--num_subs', type=int, default=10)
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
     parser.add_argument('--gpus', type=str, default='1')
     parser.add_argument('--val_check_interval', type=float, default=1.0)
@@ -265,7 +293,7 @@ if __name__ == '__main__':
     hparams = vars(args)
 
     dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, roi=args.roi,
-                             num_frames=args.video_frames, resolution=args.video_size,
+                             num_frames=args.video_frames, resolution=args.video_size, track=args.track,
                              cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
     dm.setup()
     hparams['output_size'] = dm.num_voxels
