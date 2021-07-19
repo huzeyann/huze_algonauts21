@@ -106,6 +106,7 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.25)
         parser.add_argument('--sample_voxels', default=False, action="store_true")
+        parser.add_argument('--sample_num_voxels', type=int, default=1000)
         parser.add_argument('--freeze_bn', default=False, action="store_true")
         # legacy
         parser.add_argument('--softpool', default=False, action="store_true")
@@ -144,8 +145,9 @@ class LitI3DFC(LightningModule):
             out_voxels = out[self.voxel_masks.unsqueeze(0).expand(out.size()) == 1].reshape(out.shape[0], -1)
             if self.hparams.sample_voxels:
                 mask = torch.rand(out_voxels.shape[1]).unsqueeze(0).expand(out_voxels.size())
-                masked_out_voxels = out_voxels[mask > 0.5]
-                masked_y = y[mask > 0.5]
+                th = self.hparams.sample_num_voxels / mask.shape[1]
+                masked_out_voxels = out_voxels[mask < th]
+                masked_y = y[mask < th]
                 loss = F.mse_loss(masked_out_voxels, masked_y)
             else:
                 loss = F.mse_loss(out_voxels, y)
