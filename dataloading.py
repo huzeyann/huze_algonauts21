@@ -186,7 +186,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
             self.test_dataset = AlgonautsDataset(
                 self.datasets_dir,
                 train=False,
-                roi='',
+                roi=self.roi,
                 num_frames=self.num_frames,
                 resolution=self.resolution,
                 cached=self.cached,
