@@ -18,7 +18,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='debug',
+    project_name='Algonauts V2',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
