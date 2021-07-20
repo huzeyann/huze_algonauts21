@@ -303,7 +303,7 @@ if __name__ == '__main__':
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_corr/final',
-        dirpath='/home/huze/.cache/checkpoints',
+        dirpath=f'/home/huze/.cache/checkpoints/{task.id}',
         filename='MiniFC-{epoch:02d}-{val_corr/final:.6f}',
         save_weights_only=True,
         save_top_k=1,
@@ -360,10 +360,10 @@ if __name__ == '__main__':
     if args.save_checkpoints:
         plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
         prediction = trainer.predict(plmodel, datamodule=dm)
+        prediction_dir = os.path.join(args.predictions_dir, task.id)
+        if not os.path.exists(prediction_dir):
+            os.system(f'mkdir {prediction_dir}')
 
-        if not os.path.exists(args.predictions_dir):
-            os.system(f'mkdir {args.predictions_dir}')
-
-        torch.save(prediction, os.path.join(args.predictions_dir, f'{args.roi}.pt'))
+        torch.save(prediction, os.path.join(prediction_dir, f'{args.roi}.pt'))
         # torch.save(checkpoint_callback.best_model_score,
         #            os.path.join(args.predictions_dir, f'{args.roi}-score-{checkpoint_callback.best_model_score:.6f}'))
