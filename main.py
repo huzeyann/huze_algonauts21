@@ -304,7 +304,7 @@ if __name__ == '__main__':
     checkpoint_callback = ModelCheckpoint(
         monitor='val_corr/final',
         dirpath='/home/huze/.cache/checkpoints',
-        filename='MiniFC-{epoch:02d}-{val_corr:.6f}',
+        filename='MiniFC-{epoch:02d}-{val_corr/final:.6f}',
         save_weights_only=True,
         save_top_k=1,
         mode='max',
