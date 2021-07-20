@@ -69,8 +69,7 @@ for pooling_sch in pooling_schs:
             cloned_task_parameters['Args/aux_loss_weight'] = 0.0
             cloned_task_parameters['Args/val_check_interval'] = 0.5
             cloned_task_parameters['Args/save_checkpoints'] = True
-            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/{cloned_task.id}/'
-            # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
+            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/'
 
             # put back into the new cloned task
 
@@ -126,8 +125,7 @@ for pooling_sch in pooling_schs:
             cloned_task_parameters['Args/aux_loss_weight'] = 0.0
             cloned_task_parameters['Args/val_check_interval'] = 0.5 if pooling_sch["x3"] != 'no' else 0.5
             cloned_task_parameters['Args/save_checkpoints'] = True
-            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/{cloned_task.id}/'
-            # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
+            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/'
 
             # put back into the new cloned task
 
@@ -179,8 +177,7 @@ for pooling_sch in pooling_schs:
             cloned_task_parameters['Args/aux_loss_weight'] = 0.0
             cloned_task_parameters['Args/val_check_interval'] = 0.5 if pooling_sch["x3"] != 'no' else 0.5
             cloned_task_parameters['Args/save_checkpoints'] = True
-            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/{cloned_task.id}/'
-            # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
+            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/'
 
             # put back into the new cloned task
 
@@ -232,8 +229,7 @@ for pooling_sch in pooling_schs:
             cloned_task_parameters['Args/aux_loss_weight'] = 0.0
             cloned_task_parameters['Args/val_check_interval'] = 0.5 if pooling_sch["x3"] != 'no' else 0.5
             cloned_task_parameters['Args/save_checkpoints'] = True
-            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/{cloned_task.id}/'
-            # cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/v1_global_pool/'
+            cloned_task_parameters['Args/predictions_dir'] = f'/home/huze/.cache/predictions/'
 
             # put back into the new cloned task
 
