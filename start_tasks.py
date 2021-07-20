@@ -13,8 +13,8 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
 # rois = ['LOC', 'FFA', 'STS', 'EBA', 'PPA', 'V1', 'V2', 'V3', 'V4']
-# rois = ['V1', 'LOC']
-rois = ['FFA', 'STS', 'EBA', 'PPA', 'V2', 'V3', 'V4']
+rois = ['V1', 'LOC']
+# rois = ['FFA', 'STS', 'EBA', 'PPA', 'V2', 'V3', 'V4']
 
 available_devices = {
     '16': [0, 1],
