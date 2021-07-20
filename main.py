@@ -304,7 +304,7 @@ if __name__ == '__main__':
     checkpoint_callback = ModelCheckpoint(
         monitor='val_corr/final',
         dirpath=f'/home/huze/.cache/checkpoints/{task.id}',
-        filename='MiniFC-{epoch:02d}-{val_corr/final:.6f}',
+        filename='{epoch:02d}-{val_corr/final:.6f}',
         save_weights_only=True,
         save_top_k=1,
         mode='max',
@@ -365,5 +365,3 @@ if __name__ == '__main__':
             os.system(f'mkdir {prediction_dir}')
 
         torch.save(prediction, os.path.join(prediction_dir, f'{args.roi}.pt'))
-        # torch.save(checkpoint_callback.best_model_score,
-        #            os.path.join(args.predictions_dir, f'{args.roi}-score-{checkpoint_callback.best_model_score:.6f}'))
