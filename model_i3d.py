@@ -434,7 +434,10 @@ class Pyramid(nn.Module):
         if self.hparams['track'] == 'mini_track':
             self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
         elif self.hparams['track'] == 'full_track':
-            self.conv_response = ConvResponseModel(final_in_dim, hparams['num_subs'], hparams)
+            if not self.hparams['no_convres']:
+                self.response = ConvResponseModel(final_in_dim, hparams['num_subs'], hparams)
+            else:
+                self.response = build_fc(hparams, final_in_dim, hparams['output_size'])
 
     def forward(self, x):
         # drop x (clone for parallel path)
@@ -450,7 +453,7 @@ class Pyramid(nn.Module):
             return out, out_aux
 
         elif self.hparams['track'] == 'full_track':
-            out = self.conv_response(self.final_fusion(x))
+            out = self.response(self.final_fusion(x))
             return out
 
     def pyramid_pathway(self, x, layers, pathways):

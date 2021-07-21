@@ -73,20 +73,20 @@ def wrap_load_fmris(root, file_list):
 
 
 class AlgonautsDataset(Dataset):
-    def __init__(self, dataset_dir, roi='EBA', num_frames=16, resolution=288,
+    def __init__(self, dataset_dir, rois='EBA', num_frames=16, resolution=288,
                  train=True, cached=True, track='mini_track', subs='all'):
         self.resolution = resolution
         self.cached = cached
-        self.roi = roi
+        self.rois = rois
         self.num_frames = num_frames
         self.train = train
         self.dataset_dir = dataset_dir
-        self.subs = [f'sub{i + 1:02d}' for i in range(10)] if subs == 'all' else subs
+        self.subs = [f'sub{i + 1:02d}' for i in range(10)] if subs == 'all' else subs.split(',')
         csv_path = os.path.join(self.dataset_dir, 'train_val.csv' if train else 'predict.csv')
         self.file_df = pd.read_csv(csv_path)
         self.track = track
         if self.track == 'full_track':
-            assert self.roi == 'WB'
+            assert self.rois == 'WB'
 
         # load
         if self.cached:  # this can get big
@@ -105,8 +105,14 @@ class AlgonautsDataset(Dataset):
                                            self.num_frames, self.resolution)
         if train:
             if self.track == 'mini_track':
-                self.fmris = wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
-                                             self.file_df[self.roi].values)
+                self.fmris = []
+                for roi in self.rois.split(','):
+                    fmri = wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
+                                           self.file_df[roi].values)
+                    self.fmris.append(fmri)
+                self.fmris, self.idx_ends = concat_and_mask([wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
+                                                                             self.file_df[roi].values)
+                                                             for roi in self.rois.split(',')])
             elif self.track == 'full_track':
                 self.fmris, self.idx_ends = concat_and_mask(
                     [wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'), self.file_df[sub].values)
@@ -126,7 +132,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
 
     def __init__(self, batch_size=1,
                  datasets_dir='',
-                 roi='EBA',
+                 rois='EBA',
                  track='mini_track',
                  subs='all',
                  num_frames=16,
@@ -142,7 +148,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
         self.resolution = resolution
         self.val_ratio = val_ratio
         self.num_frames = num_frames
-        self.roi = roi
+        self.rois = rois
         self.datasets_dir = datasets_dir
         self.train_full_len = 1000
         self.file_list = ['train_val.csv', 'predict.csv']
@@ -161,7 +167,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
             algonauts_full = AlgonautsDataset(
                 self.datasets_dir,
                 train=True,
-                roi=self.roi,
+                rois=self.rois,
                 num_frames=self.num_frames,
                 resolution=self.resolution,
                 cached=self.cached,
@@ -186,7 +192,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
             self.test_dataset = AlgonautsDataset(
                 self.datasets_dir,
                 train=False,
-                roi=self.roi,
+                rois=self.rois,
                 num_frames=self.num_frames,
                 resolution=self.resolution,
                 cached=self.cached,

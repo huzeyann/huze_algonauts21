@@ -295,7 +295,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = vars(args)
 
-    dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, roi=args.roi,
+    dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
                              num_frames=args.video_frames, resolution=args.video_size, track=args.track,
                              cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
     dm.setup()
@@ -367,4 +367,4 @@ if __name__ == '__main__':
         if not os.path.exists(prediction_dir):
             os.system(f'mkdir {prediction_dir}')
 
-        torch.save(prediction, os.path.join(prediction_dir, f'{args.roi}.pt'))
+        torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
