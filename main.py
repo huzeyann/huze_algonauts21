@@ -18,7 +18,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts V2',
+    project_name='Algonauts V2 FULL',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -339,6 +339,7 @@ if __name__ == '__main__':
         val_check_interval=args.val_check_interval,
         callbacks=callbacks,
         # auto_lr_find=True,
+        auto_scale_batch_size='binsearch' # useful?
     )
 
     if args.backbone_type == 'x3':
@@ -355,7 +356,9 @@ if __name__ == '__main__':
     plmodel = LitI3DFC(backbone, hparams)
 
     # trainer.tune(plmodel, datamodule=dm)
-    trainer.fit(plmodel, dm)
+    # print(plmodel.hparams.batch_size)
+    # print(dm.batch_size)
+    trainer.fit(plmodel, datamodule=dm)
 
     if args.save_checkpoints:
         plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
