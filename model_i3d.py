@@ -434,7 +434,7 @@ class Pyramid(nn.Module):
         if self.hparams['track'] == 'mini_track':
             self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
         elif self.hparams['track'] == 'full_track':
-            if not self.hparams['no_convres']:
+            if not self.hparams['no_convtrans']:
                 self.response = ConvResponseModel(final_in_dim, hparams['num_subs'], hparams)
             else:
                 self.response = build_fc(hparams, final_in_dim, hparams['output_size'])

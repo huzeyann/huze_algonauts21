@@ -88,7 +88,7 @@ class AlgonautsDataset(Dataset):
         if self.track == 'full_track':
             assert self.rois == 'WB'
 
-        # load
+        # load video
         if self.cached:  # this can get big
             cache_dir = '/home/huze/.cache/'
             cache_file = cache_dir + f'videos_{self.num_frames}_{self.resolution}_{self.train}.pt'
@@ -103,6 +103,7 @@ class AlgonautsDataset(Dataset):
             self.videos = wrap_load_videos(os.path.join(self.dataset_dir, 'videos'),
                                            self.file_df['vid'].values,
                                            self.num_frames, self.resolution)
+        # load fmri
         if train:
             if self.track == 'mini_track':
                 self.fmris = []
@@ -174,6 +175,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 track=self.track,
                 subs=self.subs
             )
+
             num_train = int(self.train_full_len * (1 - self.val_ratio))
             num_val = int(self.train_full_len * self.val_ratio)
             if self.random_split:

@@ -18,7 +18,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts V2 FULL',
+    project_name='debug',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -74,7 +74,8 @@ class LitI3DFC(LightningModule):
         else:
             self.neck = MiniFC(hparams)
 
-        if self.hparams.track == 'full_track':
+        if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
+            # voxel mask
             subs = [f'sub{i + 1:02d}' for i in range(10)] if self.hparams.subs == 'all' else self.hparams.subs
             voxel_masks = []
             for sub in subs:
@@ -84,6 +85,11 @@ class LitI3DFC(LightningModule):
                 voxel_masks.append(voxel_mask)
             print('voxel_mask in ', self.device)
             self.voxel_masks = torch.stack(voxel_masks, 0)
+
+        if self.hparams.voxel_wise:
+            # record each step every voxel
+            self.recored_voxel_corrs = np.array([])
+            self.recored_predictions = np.array([])
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -109,6 +115,9 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--sample_num_voxels', type=int, default=1000)
         parser.add_argument('--freeze_bn', default=False, action="store_true")
         parser.add_argument('--convtrans_bn', default=False, action="store_true")
+        parser.add_argument('--no_convtrans', default=False, action="store_true")
+        parser.add_argument('--voxel_wise', default=False, action="store_true")
+        parser.add_argument('--use_cv', default=False, action="store_true")
         # legacy
         parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")
@@ -200,8 +209,8 @@ class LitI3DFC(LightningModule):
         # val_outs = {k: torch.cat(v, 0) for k, v in val_step_outputs.items()}
         val_outs = torch.cat([out['out'] for out in val_step_outputs], 0)
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
-        val_corr = vectorized_correlation(val_outs, val_ys).mean()
-        self.log('val_corr/final', val_corr, prog_bar=True, logger=True, sync_dist=True)
+        val_corr = vectorized_correlation(val_outs, val_ys)
+        self.log('val_corr/final', val_corr.mean(), prog_bar=True, logger=True, sync_dist=True)
 
         # aux heads
         if val_step_outputs[0]['out_aux'] is not None:
@@ -214,6 +223,18 @@ class LitI3DFC(LightningModule):
                 outs = torch.cat(outs, 0)
                 aux_val_corr = vectorized_correlation(outs, val_ys).mean()
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
+
+        if self.hparams.voxel_wise:
+            val_corr = val_corr.cpu().float().numpy()
+            self.recored_voxel_corrs = np.vstack(
+                [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs.size else val_corr
+            prediction = self.trainer.predict()
+            if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
+                prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
+                    prediction.shape[0], -1)
+            prediction = prediction.cpu().float().numpy()
+            self.recored_predictions = np.vstack(
+                [self.recored_predictions, prediction]) if self.recored_predictions else prediction
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
@@ -339,7 +360,7 @@ if __name__ == '__main__':
         val_check_interval=args.val_check_interval,
         callbacks=callbacks,
         # auto_lr_find=True,
-        auto_scale_batch_size='binsearch' # useful?
+        auto_scale_batch_size='binsearch'  # useful?
     )
 
     if args.backbone_type == 'x3':
@@ -360,11 +381,16 @@ if __name__ == '__main__':
     # print(dm.batch_size)
     trainer.fit(plmodel, datamodule=dm)
 
-    if args.save_checkpoints:
-        plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
-        prediction = trainer.predict(plmodel, datamodule=dm)
+    if args.predictions_dir:
         prediction_dir = os.path.join(args.predictions_dir, task.id)
         if not os.path.exists(prediction_dir):
             os.system(f'mkdir {prediction_dir}')
 
-        torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
+    if not args.voxel_wise:
+        if args.save_checkpoints:
+            plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
+            prediction = trainer.predict(plmodel, datamodule=dm)
+            torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
+    else:
+        np.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.npy'))
+        np.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.npy'))
