@@ -225,14 +225,14 @@ class LitI3DFC(LightningModule):
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
         if self.hparams.voxel_wise:
-            val_corr = val_corr.cpu().float().numpy()
+            val_corr = val_corr.cpu().numpy()
             self.recored_voxel_corrs = np.vstack(
                 [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs.size else val_corr
             prediction = self.trainer.predict()
             if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
                 prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
                     prediction.shape[0], -1)
-            prediction = prediction.cpu().float().numpy()
+            prediction = prediction.cpu().numpy()
             self.recored_predictions = np.vstack(
                 [self.recored_predictions, prediction]) if self.recored_predictions else prediction
 
