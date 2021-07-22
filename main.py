@@ -60,7 +60,7 @@ class LitI3DFC(LightningModule):
         # self.hparams = hparams
         self.lr = self.hparams.learning_rate
 
-        self.automatic_optimization = False
+        # self.automatic_optimization = False
 
         # self.train_transform = DataAugmentation()
         self.train_transform = None
@@ -152,7 +152,10 @@ class LitI3DFC(LightningModule):
             return out, all_loss, out_aux
         elif self.hparams.track == 'full_track':
             out = self(x)
-            out_voxels = out[self.voxel_masks.unsqueeze(0).expand(out.size()) == 1].reshape(out.shape[0], -1)
+            if not self.hparams.no_convtrans:
+                out_voxels = out[self.voxel_masks.unsqueeze(0).expand(out.size()) == 1].reshape(out.shape[0], -1)
+            else:
+                out_voxels = out
             if self.hparams.sample_voxels:
                 mask = torch.rand(out_voxels.shape[1]).unsqueeze(0).expand(out_voxels.size())
                 th = self.hparams.sample_num_voxels / mask.shape[1]
@@ -166,16 +169,8 @@ class LitI3DFC(LightningModule):
                          on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             return out_voxels, loss, None
 
-    # def training_step(self, batch, batch_idx):
-    #     x, y = batch
-    #     # x = self.train_transform(x)
-    #     batch = (x, y)
-    #
-    #     out, loss = self._shared_train_val(batch, batch_idx, 'train')
-    #     return loss
-
     def training_step(self, batch, batch_idx):
-        self.train()
+        # print(self.neck.first_fcs['none_x3'][0].weight[0, 0])
         if self.hparams.freeze_bn:
             self.backbone.apply(disable_bn)
         x, y = batch
@@ -183,18 +178,29 @@ class LitI3DFC(LightningModule):
         batch = (x, y)
 
         out, loss, _ = self._shared_train_val(batch, batch_idx, 'train')
-        self.manual_backward(loss)  # take care fp16
+        return loss
 
-        optimizer = self.optimizers()
-
-        if self.hparams.asm:
-            optimizer.first_step(zero_grad=True)
-            self.backbone.apply(disable_bn)
-            out, loss = self._shared_train_val(batch, batch_idx, 'train', is_log=False)
-            self.manual_backward(loss)  # take care fp16
-            optimizer.second_step(zero_grad=True)
-        else:
-            optimizer.step()
+    # def training_step(self, batch, batch_idx):
+    #     self.train()
+    #     if self.hparams.freeze_bn:
+    #         self.backbone.apply(disable_bn)
+    #     x, y = batch
+    #     x = self.train_transform(x) if self.train_transform is not None else x
+    #     batch = (x, y)
+    #
+    #     out, loss, _ = self._shared_train_val(batch, batch_idx, 'train')
+    #     self.manual_backward(loss)  # take care fp16
+    #
+    #     optimizer = self.optimizers()
+    #
+    #     if self.hparams.asm:
+    #         optimizer.first_step(zero_grad=True)
+    #         self.backbone.apply(disable_bn)
+    #         out, loss = self._shared_train_val(batch, batch_idx, 'train', is_log=False)
+    #         self.manual_backward(loss)  # take care fp16
+    #         optimizer.second_step(zero_grad=True)
+    #     else:
+    #         optimizer.step()
 
     def validation_step(self, batch, batch_idx):
         out, loss, out_aux = self._shared_train_val(batch, batch_idx, 'val')
@@ -203,13 +209,10 @@ class LitI3DFC(LightningModule):
         return {'out': out, 'y': y, 'out_aux': out_aux}
 
     def validation_epoch_end(self, val_step_outputs) -> None:
-        # print("hello there")
-        # val_corr = self.val_corr.compute()
-        # self.log('val_corr', val_corr, prog_bar=True, logger=True)
-        # val_outs = {k: torch.cat(v, 0) for k, v in val_step_outputs.items()}
         val_outs = torch.cat([out['out'] for out in val_step_outputs], 0)
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
         val_corr = vectorized_correlation(val_outs, val_ys)
+        # print(val_corr.mean())
         self.log('val_corr/final', val_corr.mean(), prog_bar=True, logger=True, sync_dist=True)
 
         # aux heads
@@ -224,18 +227,25 @@ class LitI3DFC(LightningModule):
                 aux_val_corr = vectorized_correlation(outs, val_ys).mean()
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
-        if self.hparams.voxel_wise and self.current_epoch > 0:
-            val_corr = val_corr.cpu()
-            self.recored_voxel_corrs = torch.vstack(
-                [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
-            prediction = self.trainer.predict()
-            prediction = torch.cat([p[0] for p in prediction], 0)
-            if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
-                prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
-                    prediction.shape[0], -1)
-            prediction = prediction.cpu()
-            self.recored_predictions = torch.vstack(
-                [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
+        # if self.hparams.voxel_wise:
+        #     val_corr = val_corr.cpu()
+        #     self.recored_voxel_corrs = torch.vstack(
+        #         [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
+        #
+        #     with torch.no_grad():
+        #         device = self.backbone.conv1.weight.device
+        #         prediction = []
+        #         for batch in self.trainer.datamodule.predict_dataloader():
+        #             out = self(batch.to(device))
+        #             prediction.append(out)
+        #
+        #     prediction = torch.cat([p[0] for p in prediction], 0)
+        #     if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
+        #         prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
+        #             prediction.shape[0], -1)
+        #     prediction = prediction.cpu()
+        #     self.recored_predictions = torch.vstack(
+        #         [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
@@ -311,7 +321,7 @@ if __name__ == '__main__':
     parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--asm", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true")
-    parser.add_argument('--predictions_dir', type=str, default='/home/huze/.cache/predictions/')
+    parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
 
     parser = LitI3DFC.add_model_specific_args(parser)
@@ -358,13 +368,16 @@ if __name__ == '__main__':
         limit_train_batches=1.0 if not args.debug else 0.2,
         limit_val_batches=1.0 if not args.debug else 0.5,
         # limit_test_batches=0.3,
-        max_epochs=args.max_epochs if not args.debug else 2,
+        max_epochs=args.max_epochs if not args.debug else 3,
         checkpoint_callback=args.save_checkpoints,
         val_check_interval=args.val_check_interval,
         callbacks=callbacks,
         # auto_lr_find=True,
-        auto_scale_batch_size='binsearch'  # useful?
+        # auto_scale_batch_size='binsearch'  # useful?
+        # track_grad_norm=2,
     )
+    if args.debug:
+        torch.set_printoptions(10)
 
     if args.backbone_type == 'x3':
         backbone = modify_resnets_patrial_x3(multi_resnet3d50(cache_dir=args.cache_dir))
@@ -391,7 +404,8 @@ if __name__ == '__main__':
 
     if not args.voxel_wise:
         if args.save_checkpoints:
-            plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone, hparams=hparams)
+            plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
+                                                    hparams=hparams)
             prediction = trainer.predict(plmodel, datamodule=dm)
             torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
     else:
