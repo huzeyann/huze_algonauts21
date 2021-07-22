@@ -291,6 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('--video_frames', type=int, default=16)
     parser.add_argument('--video_size', type=int, default=288)
     parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--accumulate_grad_batches', type=int, default=1)
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
     parser.add_argument('--track', type=str, default='mini_track')
@@ -350,6 +351,7 @@ if __name__ == '__main__':
     trainer = pl.Trainer(
         precision=16 if args.fp16 else 32,
         gpus=args.gpus,
+        accumulate_grad_batches=args.accumulate_grad_batches,
         # accelerator='ddp',
         # plugins=DDPPlugin(find_unused_parameters=False),
         limit_train_batches=1.0 if not args.debug else 0.2,
