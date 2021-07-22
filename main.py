@@ -88,8 +88,8 @@ class LitI3DFC(LightningModule):
 
         if self.hparams.voxel_wise:
             # record each step every voxel
-            self.recored_voxel_corrs = np.array([])
-            self.recored_predictions = np.array([])
+            self.recored_voxel_corrs = None
+            self.recored_predictions = None
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -224,17 +224,18 @@ class LitI3DFC(LightningModule):
                 aux_val_corr = vectorized_correlation(outs, val_ys).mean()
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
-        if self.hparams.voxel_wise:
-            val_corr = val_corr.cpu().numpy()
-            self.recored_voxel_corrs = np.vstack(
-                [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs.size else val_corr
+        if self.hparams.voxel_wise and self.current_epoch > 0:
+            val_corr = val_corr.cpu()
+            self.recored_voxel_corrs = torch.vstack(
+                [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
             prediction = self.trainer.predict()
+            prediction = torch.cat([p[0] for p in prediction], 0)
             if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
                 prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
                     prediction.shape[0], -1)
-            prediction = prediction.cpu().numpy()
-            self.recored_predictions = np.vstack(
-                [self.recored_predictions, prediction]) if self.recored_predictions else prediction
+            prediction = prediction.cpu()
+            self.recored_predictions = torch.vstack(
+                [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
@@ -310,7 +311,7 @@ if __name__ == '__main__':
     parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--asm", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true")
-    parser.add_argument('--predictions_dir', type=str, default='/home/huze/.cache/predictions/debug/')
+    parser.add_argument('--predictions_dir', type=str, default='/home/huze/.cache/predictions/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
 
     parser = LitI3DFC.add_model_specific_args(parser)
@@ -394,5 +395,5 @@ if __name__ == '__main__':
             prediction = trainer.predict(plmodel, datamodule=dm)
             torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
     else:
-        np.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.npy'))
-        np.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.npy'))
+        torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.pt'))
+        torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.pt'))
