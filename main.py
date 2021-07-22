@@ -117,7 +117,6 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--convtrans_bn', default=False, action="store_true")
         parser.add_argument('--no_convtrans', default=False, action="store_true")
         parser.add_argument('--voxel_wise', default=False, action="store_true")
-        parser.add_argument('--use_cv', default=False, action="store_true")
         # legacy
         parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")
@@ -238,11 +237,14 @@ class LitI3DFC(LightningModule):
                 for batch in self.trainer.datamodule.predict_dataloader():
                     out = self(batch.to(device))
                     prediction.append(out)
+                    # print(out.shape)
 
-            prediction = torch.cat([p[0] for p in prediction], 0)
             if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
+                prediction = torch.cat(prediction, 0)
                 prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
                     prediction.shape[0], -1)
+            else:
+                prediction = torch.cat([p[0] for p in prediction], 0) # aux in 1
             prediction = prediction.cpu()
             self.recored_predictions = torch.vstack(
                 [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
@@ -316,6 +318,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--val_random_split', default=False, action="store_true")
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
+    parser.add_argument('--use_cv', default=False, action="store_true")
     parser.add_argument('--early_stop_epochs', type=int, default=10)
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")
@@ -327,12 +330,6 @@ if __name__ == '__main__':
     parser = LitI3DFC.add_model_specific_args(parser)
     args = parser.parse_args()
     hparams = vars(args)
-
-    dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
-                             num_frames=args.video_frames, resolution=args.video_size, track=args.track,
-                             cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
-    dm.setup()
-    hparams['output_size'] = dm.num_voxels
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_corr/final',
@@ -368,9 +365,9 @@ if __name__ == '__main__':
         limit_train_batches=1.0 if not args.debug else 0.2,
         limit_val_batches=1.0 if not args.debug else 0.5,
         # limit_test_batches=0.3,
-        max_epochs=args.max_epochs if not args.debug else 3,
+        max_epochs=args.max_epochs if not args.debug else 2,
         checkpoint_callback=args.save_checkpoints,
-        val_check_interval=args.val_check_interval,
+        val_check_interval=args.val_check_interval if not args.debug else 1.0,
         callbacks=callbacks,
         # auto_lr_find=True,
         # auto_scale_batch_size='binsearch'  # useful?
@@ -390,24 +387,52 @@ if __name__ == '__main__':
     else:
         NotImplementedError()
 
-    plmodel = LitI3DFC(backbone, hparams)
+    if not args.use_cv:
+        dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
+                                 num_frames=args.video_frames, resolution=args.video_size, track=args.track,
+                                 cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
+        dm.setup()
+        hparams['output_size'] = dm.num_voxels
 
-    # trainer.tune(plmodel, datamodule=dm)
-    # print(plmodel.hparams.batch_size)
-    # print(dm.batch_size)
-    trainer.fit(plmodel, datamodule=dm)
+        plmodel = LitI3DFC(backbone, hparams)
 
-    if args.predictions_dir:
-        prediction_dir = os.path.join(args.predictions_dir, task.id)
-        if not os.path.exists(prediction_dir):
-            os.system(f'mkdir {prediction_dir}')
+        trainer.fit(plmodel, datamodule=dm)
 
-    if not args.voxel_wise:
-        if args.save_checkpoints:
-            plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
-                                                    hparams=hparams)
-            prediction = trainer.predict(plmodel, datamodule=dm)
-            torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
+        if args.predictions_dir:
+            prediction_dir = os.path.join(args.predictions_dir, task.id)
+            if not os.path.exists(prediction_dir):
+                os.system(f'mkdir {prediction_dir}')
+
+        if not args.voxel_wise:
+            if args.save_checkpoints:
+                plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
+                                                        hparams=hparams)
+                prediction = trainer.predict(plmodel, datamodule=dm)
+                torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
+        else:
+            torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.pt'))
+            torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.pt'))
     else:
-        torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.pt'))
-        torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.pt'))
+        assert args.voxel_wise == True
+
+        num_split = int(1 / args.val_ratio)
+        for i in range(num_split):
+            if i == 0:
+                dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
+                                         num_frames=args.video_frames, resolution=args.video_size, track=args.track,
+                                         cached=args.cached, val_ratio=args.val_ratio,
+                                         random_split=args.val_random_split,
+                                         use_cv=True, num_split=num_split, fold=i)
+            else:
+                dm.fold = i
+            dm.setup()
+            hparams['output_size'] = dm.num_voxels
+            plmodel = LitI3DFC(backbone, hparams)
+            trainer.fit(plmodel, datamodule=dm)
+
+            prediction_dir = os.path.join(args.predictions_dir, task.id)
+            if not os.path.exists(prediction_dir):
+                os.system(f'mkdir {prediction_dir}')
+
+            torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions_{i}.pt'))
+            torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs_{i}.pt'))

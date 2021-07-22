@@ -15,6 +15,7 @@ from torch import nn
 from tqdm import tqdm
 from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from torchvision.datasets import MNIST
+from sklearn.model_selection import KFold
 
 import kornia as K
 
@@ -140,8 +141,14 @@ class AlgonautsDataModule(pl.LightningDataModule):
                  resolution=288,
                  val_ratio=0.1,
                  cached=True,
-                 random_split=False):
+                 random_split=False,
+                 use_cv=False,
+                 num_split=None,
+                 fold=0,):
         super().__init__()
+        self.fold = fold
+        self.num_split = num_split
+        self.use_cv = use_cv
         self.subs = subs
         self.track = track
         self.random_split = random_split
@@ -176,17 +183,25 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 subs=self.subs
             )
 
-            num_train = int(self.train_full_len * (1 - self.val_ratio))
-            num_val = int(self.train_full_len * self.val_ratio)
-            if self.random_split:
-                self.train_dataset, self.val_dataset = random_split(algonauts_full, [num_train, num_val],
-                                                                    generator=torch.Generator().manual_seed(42))
+            if not self.use_cv:
+                num_train = int(self.train_full_len * (1 - self.val_ratio))
+                num_val = int(self.train_full_len * self.val_ratio)
+                if self.random_split:
+                    self.train_dataset, self.val_dataset = random_split(algonauts_full, [num_train, num_val],
+                                                                        generator=torch.Generator().manual_seed(42))
+                else:
+                    lengths = [num_train, num_val]
+                    indices = np.arange(sum(lengths)).tolist()
+                    self.train_dataset, self.val_dataset = \
+                        [Subset(algonauts_full, indices[offset - length: offset]) for offset, length in
+                         zip(_accumulate(lengths), lengths)]
             else:
-                lengths = [num_train, num_val]
-                indices = np.arange(sum(lengths)).tolist()
-                self.train_dataset, self.val_dataset = \
-                    [Subset(algonauts_full, indices[offset - length: offset]) for offset, length in
-                     zip(_accumulate(lengths), lengths)]
+                assert self.num_split > 0
+                kf = KFold(n_splits=self.num_split)
+                train, val = list(kf.split(np.arange(self.train_full_len)))[self.fold]
+                self.train_dataset = Subset(algonauts_full, train)
+                self.val_dataset = Subset(algonauts_full, val)
+
             self.num_voxels = self.train_dataset[0][1].shape[0]
 
         # Assign Test split(s) for use in Dataloaders
