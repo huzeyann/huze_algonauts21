@@ -227,25 +227,25 @@ class LitI3DFC(LightningModule):
                 aux_val_corr = vectorized_correlation(outs, val_ys).mean()
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
-        # if self.hparams.voxel_wise:
-        #     val_corr = val_corr.cpu()
-        #     self.recored_voxel_corrs = torch.vstack(
-        #         [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
-        #
-        #     with torch.no_grad():
-        #         device = self.backbone.conv1.weight.device
-        #         prediction = []
-        #         for batch in self.trainer.datamodule.predict_dataloader():
-        #             out = self(batch.to(device))
-        #             prediction.append(out)
-        #
-        #     prediction = torch.cat([p[0] for p in prediction], 0)
-        #     if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
-        #         prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
-        #             prediction.shape[0], -1)
-        #     prediction = prediction.cpu()
-        #     self.recored_predictions = torch.vstack(
-        #         [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
+        if self.hparams.voxel_wise:
+            val_corr = val_corr.cpu()
+            self.recored_voxel_corrs = torch.vstack(
+                [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
+
+            with torch.no_grad():
+                device = self.backbone.conv1.weight.device
+                prediction = []
+                for batch in self.trainer.datamodule.predict_dataloader():
+                    out = self(batch.to(device))
+                    prediction.append(out)
+
+            prediction = torch.cat([p[0] for p in prediction], 0)
+            if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
+                prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
+                    prediction.shape[0], -1)
+            prediction = prediction.cpu()
+            self.recored_predictions = torch.vstack(
+                [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
