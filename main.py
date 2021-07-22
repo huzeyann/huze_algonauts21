@@ -295,7 +295,7 @@ if __name__ == '__main__':
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
     parser.add_argument('--track', type=str, default='mini_track')
     parser.add_argument('--backbone_type', type=str, default='x3')
-    parser.add_argument('--roi', type=str, default="EBA")
+    parser.add_argument('--rois', type=str, default="EBA")
     parser.add_argument('--subs', type=str, default="all")
     parser.add_argument('--num_subs', type=int, default=10)
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
