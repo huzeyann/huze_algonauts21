@@ -7,7 +7,8 @@ BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
                  task_name='Task Manager',
-                 task_type=Task.TaskTypes.optimizer)
+                 task_type=Task.TaskTypes.optimizer,
+                 reuse_last_task_id=False)
 
 template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
