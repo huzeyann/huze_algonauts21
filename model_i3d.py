@@ -311,7 +311,7 @@ class ConvResponseModel(nn.Module):
         if hparams['convtrans_bn']:
             self.convt = nn.Sequential(
                 nn.ConvTranspose3d(1024, 512, (3, 3, 3), (2, 2, 2)),
-                nn.BatchNorm3d(1024),
+                nn.BatchNorm3d(512),
                 nn.ELU(),
                 nn.ConvTranspose3d(512, 256, (3, 3, 3), (2, 2, 2)),
                 nn.BatchNorm3d(256),
