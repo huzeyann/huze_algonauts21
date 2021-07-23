@@ -307,11 +307,11 @@ class ConvResponseModel(nn.Module):
 
     def __init__(self, in_dim, out_dim, hparams):
         super(ConvResponseModel, self).__init__()
-        self.fc = nn.Sequential(nn.Linear(in_dim, 512 * 4 * 5 * 4), nn.ELU())
+        self.fc = nn.Sequential(nn.Linear(in_dim, 1024 * 4 * 5 * 4), nn.ELU())
         if hparams['convtrans_bn']:
             self.convt = nn.Sequential(
-                nn.ConvTranspose3d(512, 512, (3, 3, 3), (2, 2, 2)),
-                nn.BatchNorm3d(512),
+                nn.ConvTranspose3d(1024, 1024, (3, 3, 3), (2, 2, 2)),
+                nn.BatchNorm3d(1024),
                 nn.ELU(),
                 nn.ConvTranspose3d(512, 256, (3, 3, 3), (2, 2, 2)),
                 nn.BatchNorm3d(256),
@@ -323,7 +323,7 @@ class ConvResponseModel(nn.Module):
             )
         else:
             self.convt = nn.Sequential(
-                nn.ConvTranspose3d(512, 512, (3, 3, 3), (2, 2, 2)),
+                nn.ConvTranspose3d(1024, 1024, (3, 3, 3), (2, 2, 2)),
                 # nn.BatchNorm3d(512),
                 nn.ELU(),
                 nn.ConvTranspose3d(512, 256, (3, 3, 3), (2, 2, 2)),

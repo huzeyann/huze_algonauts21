@@ -144,7 +144,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                  random_split=False,
                  use_cv=False,
                  num_split=None,
-                 fold=0,):
+                 fold=-1,):
         super().__init__()
         self.fold = fold
         self.num_split = num_split

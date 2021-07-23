@@ -18,7 +18,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='debug',
+    project_name='Algonauts V3 voxel',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -227,9 +227,12 @@ class LitI3DFC(LightningModule):
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
         if self.hparams.voxel_wise:
+            prediction_dir = os.path.join(args.predictions_dir, task.id)
+
             val_corr = val_corr.cpu()
-            self.recored_voxel_corrs = torch.vstack(
-                [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
+            # self.recored_voxel_corrs = torch.vstack(
+            #     [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
+            torch.save(val_corr, os.path.join(prediction_dir, f'voxel_vorrs-{self.global_step}.pt'))
 
             with torch.no_grad():
                 device = self.backbone.conv1.weight.device
@@ -237,17 +240,17 @@ class LitI3DFC(LightningModule):
                 for batch in self.trainer.datamodule.predict_dataloader():
                     out = self(batch.to(device))
                     prediction.append(out)
-                    # print(out.shape)
 
             if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
                 prediction = torch.cat(prediction, 0)
                 prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
                     prediction.shape[0], -1)
             else:
-                prediction = torch.cat([p[0] for p in prediction], 0) # aux in 1
+                prediction = torch.cat([p[0] for p in prediction], 0)  # aux in 1
             prediction = prediction.cpu()
-            self.recored_predictions = torch.vstack(
-                [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
+            # self.recored_predictions = torch.vstack(
+            #     [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
+            torch.save(prediction, os.path.join(prediction_dir, f'predictions-{self.global_step}.pt'))
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
@@ -299,37 +302,15 @@ class LitI3DFC(LightningModule):
         return [optimizer], []
 
 
-if __name__ == '__main__':
-    parser = ArgumentParser()
-    parser.add_argument('--video_frames', type=int, default=16)
-    parser.add_argument('--video_size', type=int, default=288)
-    parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--accumulate_grad_batches', type=int, default=1)
-    parser.add_argument('--max_epochs', type=int, default=300)
-    parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
-    parser.add_argument('--track', type=str, default='mini_track')
-    parser.add_argument('--backbone_type', type=str, default='x3')
-    parser.add_argument('--rois', type=str, default="EBA")
-    parser.add_argument('--subs', type=str, default="all")
-    parser.add_argument('--num_subs', type=int, default=10)
-    parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
-    parser.add_argument('--gpus', type=str, default='1')
-    parser.add_argument('--val_check_interval', type=float, default=1.0)
-    parser.add_argument('--val_ratio', type=float, default=0.1)
-    parser.add_argument('--val_random_split', default=False, action="store_true")
-    parser.add_argument('--save_checkpoints', default=False, action="store_true")
-    parser.add_argument('--use_cv', default=False, action="store_true")
-    parser.add_argument('--early_stop_epochs', type=int, default=10)
-    parser.add_argument('--cached', default=False, action="store_true")
-    parser.add_argument("--fp16", default=False, action="store_true")
-    parser.add_argument("--asm", default=False, action="store_true")
-    parser.add_argument("--debug", default=False, action="store_true")
-    parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
-    parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
-
-    parser = LitI3DFC.add_model_specific_args(parser)
-    args = parser.parse_args()
+def train(args):
     hparams = vars(args)
+
+    dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
+                             num_frames=args.video_frames, resolution=args.video_size, track=args.track,
+                             cached=args.cached, val_ratio=args.val_ratio,
+                             random_split=args.val_random_split,
+                             use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold)
+    dm.setup()
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_corr/final',
@@ -370,86 +351,76 @@ if __name__ == '__main__':
     else:
         NotImplementedError()
 
-    if not args.use_cv:
-        trainer = pl.Trainer(
-            precision=16 if args.fp16 else 32,
-            gpus=args.gpus,
-            accumulate_grad_batches=args.accumulate_grad_batches,
-            # accelerator='ddp',
-            # plugins=DDPPlugin(find_unused_parameters=False),
-            limit_train_batches=1.0 if not args.debug else 0.2,
-            limit_val_batches=1.0 if not args.debug else 0.5,
-            # limit_test_batches=0.3,
-            max_epochs=args.max_epochs if not args.debug else 2,
-            checkpoint_callback=args.save_checkpoints,
-            val_check_interval=args.val_check_interval if not args.debug else 1.0,
-            callbacks=callbacks,
-            # auto_lr_find=True,
-            # auto_scale_batch_size='binsearch'  # useful?
-            # track_grad_norm=2,
-        )
-        dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
-                                 num_frames=args.video_frames, resolution=args.video_size, track=args.track,
-                                 cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
-        dm.setup()
-        hparams['output_size'] = dm.num_voxels
+    trainer = pl.Trainer(
+        precision=16 if args.fp16 else 32,
+        gpus=args.gpus,
+        accumulate_grad_batches=args.accumulate_grad_batches,
+        # accelerator='ddp',
+        # plugins=DDPPlugin(find_unused_parameters=False),
+        limit_train_batches=1.0 if not args.debug else 0.2,
+        limit_val_batches=1.0 if not args.debug else 0.5,
+        # limit_test_batches=0.3,
+        max_epochs=args.max_epochs if not args.debug else 2,
+        checkpoint_callback=args.save_checkpoints,
+        val_check_interval=args.val_check_interval if not args.debug else 1.0,
+        callbacks=callbacks,
+        # auto_lr_find=True,
+        # auto_scale_batch_size='binsearch'  # useful?
+        # track_grad_norm=2,
+    )
 
-        plmodel = LitI3DFC(backbone, hparams)
+    hparams['output_size'] = dm.num_voxels
 
-        trainer.fit(plmodel, datamodule=dm)
+    if args.predictions_dir:
+        prediction_dir = os.path.join(args.predictions_dir, task.id)
+        if not os.path.exists(prediction_dir):
+            os.system(f'mkdir {prediction_dir}')
 
-        if args.predictions_dir:
-            prediction_dir = os.path.join(args.predictions_dir, task.id)
-            if not os.path.exists(prediction_dir):
-                os.system(f'mkdir {prediction_dir}')
+    plmodel = LitI3DFC(backbone, hparams)
 
-        if not args.voxel_wise:
-            if args.save_checkpoints:
-                plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
-                                                        hparams=hparams)
-                prediction = trainer.predict(plmodel, datamodule=dm)
-                torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
-        else:
-            torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.pt'))
-            torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.pt'))
-    else:
-        assert args.voxel_wise == True
+    trainer.fit(plmodel, datamodule=dm)
 
-        num_split = int(1 / args.val_ratio)
-        for i in range(num_split):
-            trainer = pl.Trainer(
-                precision=16 if args.fp16 else 32,
-                gpus=args.gpus,
-                accumulate_grad_batches=args.accumulate_grad_batches,
-                # accelerator='ddp',
-                # plugins=DDPPlugin(find_unused_parameters=False),
-                limit_train_batches=1.0 if not args.debug else 0.2,
-                limit_val_batches=1.0 if not args.debug else 0.5,
-                # limit_test_batches=0.3,
-                max_epochs=args.max_epochs if not args.debug else 2,
-                checkpoint_callback=args.save_checkpoints,
-                val_check_interval=args.val_check_interval if not args.debug else 1.0,
-                callbacks=callbacks,
-                # auto_lr_find=True,
-                # auto_scale_batch_size='binsearch'  # useful?
-                # track_grad_norm=2,
-            )
-            if i == 0:
-                dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
-                                         num_frames=args.video_frames, resolution=args.video_size, track=args.track,
-                                         cached=args.cached, val_ratio=args.val_ratio,
-                                         random_split=args.val_random_split,
-                                         use_cv=True, num_split=num_split, fold=i)
-            else:
-                dm.fold = i
-            dm.setup()
-            hparams['output_size'] = dm.num_voxels
-            plmodel = LitI3DFC(backbone, hparams)
-            trainer.fit(plmodel, datamodule=dm)
+    if not args.voxel_wise:
+        if args.save_checkpoints:
+            plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
+                                                    hparams=hparams)
+            prediction = trainer.predict(plmodel, datamodule=dm)
+            torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
+    # else:
+    #     torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.pt'))
+    #     torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.pt'))
 
-            prediction_dir = os.path.join(args.predictions_dir, task.id)
-            if not os.path.exists(prediction_dir):
-                os.system(f'mkdir {prediction_dir}')
 
-            torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions_{i}.pt'))
-            torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs_{i}.pt'))
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument('--video_frames', type=int, default=16)
+    parser.add_argument('--video_size', type=int, default=288)
+    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--accumulate_grad_batches', type=int, default=1)
+    parser.add_argument('--max_epochs', type=int, default=300)
+    parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
+    parser.add_argument('--track', type=str, default='mini_track')
+    parser.add_argument('--backbone_type', type=str, default='x3')
+    parser.add_argument('--rois', type=str, default="EBA")
+    parser.add_argument('--subs', type=str, default="all")
+    parser.add_argument('--num_subs', type=int, default=10)
+    parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
+    parser.add_argument('--gpus', type=str, default='1')
+    parser.add_argument('--val_check_interval', type=float, default=1.0)
+    parser.add_argument('--val_ratio', type=float, default=0.1)
+    parser.add_argument('--val_random_split', default=False, action="store_true")
+    parser.add_argument('--save_checkpoints', default=False, action="store_true")
+    parser.add_argument('--use_cv', default=False, action="store_true")
+    parser.add_argument('--fold', type=int, default=-1)
+    parser.add_argument('--early_stop_epochs', type=int, default=10)
+    parser.add_argument('--cached', default=False, action="store_true")
+    parser.add_argument("--fp16", default=False, action="store_true")
+    parser.add_argument("--asm", default=False, action="store_true")
+    parser.add_argument("--debug", default=False, action="store_true")
+    parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
+    parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
+
+    parser = LitI3DFC.add_model_specific_args(parser)
+    args = parser.parse_args()
+
+    train(args)
