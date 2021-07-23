@@ -336,7 +336,7 @@ class ConvResponseModel(nn.Module):
             )
     def forward(self, x):
         x = self.fc(x)
-        x = x.reshape(x.shape[0], 512, 4, 5, 4)
+        x = x.reshape(x.shape[0], 1024, 4, 5, 4)
         x = self.convt(x)
         return x
 
