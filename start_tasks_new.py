@@ -47,7 +47,7 @@ for pathway in pathways:
 
 
 
-        cloned_task.add_tags([pathway, 'x2,x3,x4'])
+        cloned_task.add_tags([pathway, 'x2,x3,x4', f'fold_{fold}'])
 
         cloned_task_parameters = cloned_task.get_parameters()
         # cloned_task_parameters['rois'] = [roi]
@@ -104,7 +104,7 @@ for pathway in pathways:
 
 
 
-        cloned_task.add_tags([pathway, 'x3,x4'])
+        cloned_task.add_tags([pathway, 'x3,x4', f'fold_{fold}'])
 
         cloned_task_parameters = cloned_task.get_parameters()
         # cloned_task_parameters['rois'] = [roi]
