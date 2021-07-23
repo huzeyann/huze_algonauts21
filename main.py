@@ -356,23 +356,6 @@ if __name__ == '__main__':
     if args.save_checkpoints:
         callbacks.append(checkpoint_callback)
 
-    trainer = pl.Trainer(
-        precision=16 if args.fp16 else 32,
-        gpus=args.gpus,
-        accumulate_grad_batches=args.accumulate_grad_batches,
-        # accelerator='ddp',
-        # plugins=DDPPlugin(find_unused_parameters=False),
-        limit_train_batches=1.0 if not args.debug else 0.2,
-        limit_val_batches=1.0 if not args.debug else 0.5,
-        # limit_test_batches=0.3,
-        max_epochs=args.max_epochs if not args.debug else 2,
-        checkpoint_callback=args.save_checkpoints,
-        val_check_interval=args.val_check_interval if not args.debug else 1.0,
-        callbacks=callbacks,
-        # auto_lr_find=True,
-        # auto_scale_batch_size='binsearch'  # useful?
-        # track_grad_norm=2,
-    )
     if args.debug:
         torch.set_printoptions(10)
 
@@ -388,6 +371,23 @@ if __name__ == '__main__':
         NotImplementedError()
 
     if not args.use_cv:
+        trainer = pl.Trainer(
+            precision=16 if args.fp16 else 32,
+            gpus=args.gpus,
+            accumulate_grad_batches=args.accumulate_grad_batches,
+            # accelerator='ddp',
+            # plugins=DDPPlugin(find_unused_parameters=False),
+            limit_train_batches=1.0 if not args.debug else 0.2,
+            limit_val_batches=1.0 if not args.debug else 0.5,
+            # limit_test_batches=0.3,
+            max_epochs=args.max_epochs if not args.debug else 2,
+            checkpoint_callback=args.save_checkpoints,
+            val_check_interval=args.val_check_interval if not args.debug else 1.0,
+            callbacks=callbacks,
+            # auto_lr_find=True,
+            # auto_scale_batch_size='binsearch'  # useful?
+            # track_grad_norm=2,
+        )
         dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
                                  num_frames=args.video_frames, resolution=args.video_size, track=args.track,
                                  cached=args.cached, val_ratio=args.val_ratio, random_split=args.val_random_split)
@@ -417,6 +417,23 @@ if __name__ == '__main__':
 
         num_split = int(1 / args.val_ratio)
         for i in range(num_split):
+            trainer = pl.Trainer(
+                precision=16 if args.fp16 else 32,
+                gpus=args.gpus,
+                accumulate_grad_batches=args.accumulate_grad_batches,
+                # accelerator='ddp',
+                # plugins=DDPPlugin(find_unused_parameters=False),
+                limit_train_batches=1.0 if not args.debug else 0.2,
+                limit_val_batches=1.0 if not args.debug else 0.5,
+                # limit_test_batches=0.3,
+                max_epochs=args.max_epochs if not args.debug else 2,
+                checkpoint_callback=args.save_checkpoints,
+                val_check_interval=args.val_check_interval if not args.debug else 1.0,
+                callbacks=callbacks,
+                # auto_lr_find=True,
+                # auto_scale_batch_size='binsearch'  # useful?
+                # track_grad_norm=2,
+            )
             if i == 0:
                 dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
                                          num_frames=args.video_frames, resolution=args.video_size, track=args.track,
