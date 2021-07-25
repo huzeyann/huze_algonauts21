@@ -2,7 +2,7 @@ import itertools
 
 from clearml import Task
 
-PROJECT_NAME = 'Algonauts Mini V2'
+PROJECT_NAME = 'Algonauts V2'
 BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
