@@ -369,7 +369,7 @@ class Pyramid(nn.Module):
         self.spp_level_dict = {
             'x1': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
             'x2': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
-            'x3': np.array([[2, 2, 2], [1, 3, 5], [1, 3, 5]]),
+            'x3': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
             'x4': np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]]),
         }
         if self.is_pyramid:
@@ -400,6 +400,11 @@ class Pyramid(nn.Module):
                 elif self.pooling_modes[x_i] == 'avg':
                     self.poolings.update({k: nn.Sequential(
                         nn.AdaptiveAvgPool3d(1),
+                        nn.Flatten())})
+                    self.fc_input_dims.update({k: self.planes})
+                elif self.pooling_modes[x_i] == 'max':
+                    self.poolings.update({k: nn.Sequential(
+                        nn.AdaptiveMaxPool3d(1),
                         nn.Flatten())})
                     self.fc_input_dims.update({k: self.planes})
                 elif self.pooling_modes[x_i] == 'spp':
