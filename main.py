@@ -98,6 +98,7 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--num_layers', type=int, default=2)
         parser.add_argument('--activation', type=str, default='elu')
         parser.add_argument('--layer_hidden', type=int, default=2048)
+        parser.add_argument('--first_layer_hidden', type=int, default=256)
         parser.add_argument('--dropout_rate', type=float, default=0.0)
         parser.add_argument('--weight_decay', type=float, default=1e-2)
         parser.add_argument('--learning_rate', type=float, default=3e-4)

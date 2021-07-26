@@ -242,12 +242,22 @@ def build_fc(p, input_dim, output_dim, part='full'):
         'elu': nn.ELU(),
     }
 
+    if part == 'full':
+        layer_hidden = p.get(f"layer_hidden")
+    elif part == 'first':
+        layer_hidden = p.get(f"first_layer_hidden")
+        layer_hidden = layer_hidden if layer_hidden > 0 else p.get(f"layer_hidden")
+    elif part == 'last':
+        layer_hidden = p.get(f"layer_hidden")
+    else:
+        NotImplementedError()
+
     module_list = []
     for i in range(p.get(f"num_layers")):
         if i == 0:
-            in_size, out_size = input_dim, p.get(f"layer_hidden")
+            in_size, out_size = input_dim, layer_hidden
         else:
-            in_size, out_size = p.get(f"layer_hidden"), p.get(f"layer_hidden")
+            in_size, out_size = layer_hidden, layer_hidden
         module_list.append(nn.Linear(in_size, out_size))
         if p.get('fc_batch_norm'):
             module_list.append(nn.BatchNorm1d(out_size))
