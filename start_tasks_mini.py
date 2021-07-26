@@ -34,7 +34,7 @@ for roi in rois:
                              name=template_task.name + f'{roi}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, 'none', 'pyramid', 'x2,x3,x4', 'x2_spp', 'x3_no', 'x4_avg'])
+    cloned_task.add_tags([roi, 'none', 'i3d_flow,vggish', 'x2,x3,x4', 'x2_spp', 'x3_no', 'x4_avg'])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
@@ -61,7 +61,7 @@ for roi in rois:
     cloned_task_parameters['Args/backbone_type'] = 'all'
     cloned_task_parameters['Args/fc_fusion'] = 'concat'
     cloned_task_parameters['Args/pyramid_layers'] = 'x2,x3,x4'
-    cloned_task_parameters['Args/additional_features'] = 'i3d_flow'
+    cloned_task_parameters['Args/additional_features'] = 'i3d_flow,vggish'
     cloned_task_parameters['Args/pathways'] = 'none'
     cloned_task_parameters['Args/aux_loss_weight'] = 0.0
     cloned_task_parameters['Args/val_check_interval'] = 0.5
@@ -90,7 +90,7 @@ for roi in rois:
                              name=template_task.name + f'{roi}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, 'none', 'pyramid', 'x2,x3,x4', 'x2_spp', 'x3_no', 'x4_avg'])
+    cloned_task.add_tags([roi, 'none', 'i3d_flow,vggish', 'x2,x3,x4', 'x2_spp', 'x3_no', 'x4_avg'])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
@@ -117,7 +117,7 @@ for roi in rois:
     cloned_task_parameters['Args/backbone_type'] = 'all'
     cloned_task_parameters['Args/fc_fusion'] = 'concat'
     cloned_task_parameters['Args/pyramid_layers'] = 'x2,x3,x4'
-    cloned_task_parameters['Args/additional_features'] = 'i3d_flow'
+    cloned_task_parameters['Args/additional_features'] = 'i3d_flow,vggish'
     cloned_task_parameters['Args/pathways'] = 'none'
     cloned_task_parameters['Args/aux_loss_weight'] = 0.0
     cloned_task_parameters['Args/val_check_interval'] = 0.5
@@ -146,7 +146,7 @@ for roi in rois:
                              name=template_task.name + f'{roi}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, 'none', 'pyramid', 'x3', 'x3_no'])
+    cloned_task.add_tags([roi, 'none', 'i3d_flow,vggish', 'x3', 'x3_no'])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
@@ -173,7 +173,7 @@ for roi in rois:
     cloned_task_parameters['Args/backbone_type'] = 'all'
     cloned_task_parameters['Args/fc_fusion'] = 'concat'
     cloned_task_parameters['Args/pyramid_layers'] = 'x3'
-    cloned_task_parameters['Args/additional_features'] = 'i3d_flow'
+    cloned_task_parameters['Args/additional_features'] = 'i3d_flow,vggish'
     cloned_task_parameters['Args/pathways'] = 'none'
     cloned_task_parameters['Args/aux_loss_weight'] = 0.0
     cloned_task_parameters['Args/val_check_interval'] = 0.5
