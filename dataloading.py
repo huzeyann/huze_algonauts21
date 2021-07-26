@@ -74,8 +74,13 @@ def wrap_load_fmris(root, file_list):
 
 
 class AlgonautsDataset(Dataset):
-    def __init__(self, dataset_dir, rois='EBA', num_frames=16, resolution=288,
+    def __init__(self, dataset_dir,
+                 additional_features='',
+                 additional_features_dir='',
+                 rois='EBA', num_frames=16, resolution=288,
                  train=True, cached=True, track='mini_track', subs='all'):
+        self.additional_features_dir = additional_features_dir
+        self.additional_features = additional_features
         self.resolution = resolution
         self.cached = cached
         self.rois = rois
@@ -104,6 +109,17 @@ class AlgonautsDataset(Dataset):
             self.videos = wrap_load_videos(os.path.join(self.dataset_dir, 'videos'),
                                            self.file_df['vid'].values,
                                            self.num_frames, self.resolution)
+
+        # load freezed layers
+        if self.additional_features:
+            self.additional_features = self.additional_features.split(',')
+            self.features = {}
+            for af in self.additional_features:
+                self.features[af] = torch.tensor(
+                    np.load(os.path.join(self.additional_features_dir, f'{af}.npy'))).float()
+        else:
+            self.additional_features = []
+
         # load fmri
         if train:
             if self.track == 'mini_track':
@@ -124,16 +140,25 @@ class AlgonautsDataset(Dataset):
         return len(self.videos)
 
     def __getitem__(self, index):
+
+        x = {'video': self.videos[index]}
+        additional_features = {af: self.features[af][index] for af in self.additional_features}
+        x.update(additional_features)
+
+        y = self.fmris[index]
+
         if self.train:
-            return self.videos[index], self.fmris[index]
+            return x, y
         else:
-            return self.videos[index]
+            return x
 
 
 class AlgonautsDataModule(pl.LightningDataModule):
 
     def __init__(self, batch_size=1,
                  datasets_dir='',
+                 additional_features='',
+                 additional_features_dir='',
                  rois='EBA',
                  track='mini_track',
                  subs='all',
@@ -144,8 +169,10 @@ class AlgonautsDataModule(pl.LightningDataModule):
                  random_split=False,
                  use_cv=False,
                  num_split=None,
-                 fold=-1,):
+                 fold=-1, ):
         super().__init__()
+        self.additional_features_dir = additional_features_dir
+        self.additional_features = additional_features
         self.fold = fold
         self.num_split = num_split
         self.use_cv = use_cv
@@ -174,6 +201,8 @@ class AlgonautsDataModule(pl.LightningDataModule):
         if stage in (None, 'fit'):
             algonauts_full = AlgonautsDataset(
                 self.datasets_dir,
+                additional_features=self.additional_features,
+                additional_features_dir=self.additional_features_dir,
                 train=True,
                 rois=self.rois,
                 num_frames=self.num_frames,
@@ -208,6 +237,8 @@ class AlgonautsDataModule(pl.LightningDataModule):
         if stage in (None, 'test'):
             self.test_dataset = AlgonautsDataset(
                 self.datasets_dir,
+                additional_features=self.additional_features,
+                additional_features_dir=self.additional_features_dir,
                 train=False,
                 rois=self.rois,
                 num_frames=self.num_frames,

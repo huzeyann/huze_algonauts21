@@ -124,8 +124,13 @@ class LitI3DFC(LightningModule):
         return parser
 
     def forward(self, x):
-        x = self.backbone(x)
-        out = self.neck(x)
+        x_vid = x['video']
+        x_add = {k: v for k, v in x.items() if k != 'video'}
+        # print('x_vid', x_vid.dtype, x_vid.device)
+        # print(x_add)
+        # print('x_add', x_add['vggish'].dtype, x_add['vggish'].device)
+        out_vid = self.backbone(x_vid)
+        out = self.neck(out_vid, x_add)
         return out
 
     def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
@@ -309,7 +314,9 @@ def train(args):
                              num_frames=args.video_frames, resolution=args.video_size, track=args.track,
                              cached=args.cached, val_ratio=args.val_ratio,
                              random_split=args.val_random_split,
-                             use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold)
+                             use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold,
+                             additional_features_dir=args.additional_features_dir,
+                             additional_features=args.additional_features)
     dm.setup()
 
     checkpoint_callback = ModelCheckpoint(
@@ -399,6 +406,8 @@ if __name__ == '__main__':
     parser.add_argument('--accumulate_grad_batches', type=int, default=1)
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
+    parser.add_argument('--additional_features', type=str, default='')
+    parser.add_argument('--additional_features_dir', type=str, default='/data_smr/huze/projects/my_algonauts/features/')
     parser.add_argument('--track', type=str, default='mini_track')
     parser.add_argument('--backbone_type', type=str, default='x3')
     parser.add_argument('--rois', type=str, default="EBA")
