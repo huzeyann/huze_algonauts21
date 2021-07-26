@@ -157,7 +157,7 @@ for roi in rois:
     cloned_task_parameters['Args/accumulate_grad_batches'] = 1
     cloned_task_parameters['Args/num_layers'] = 1
     cloned_task_parameters['Args/conv_size'] = 256
-    cloned_task_parameters['Args/first_layer_hidden'] = 1024
+    cloned_task_parameters['Args/first_layer_hidden'] = 2048
     cloned_task_parameters['Args/layer_hidden'] = 2048
     cloned_task_parameters['Args/debug'] = False
     cloned_task_parameters['Args/freeze_bn'] = False
