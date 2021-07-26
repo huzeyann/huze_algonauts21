@@ -607,8 +607,8 @@ def modify_resnets_patrial_x2(model):
 
 
 def modify_resnets_patrial_x_all(model):
-    del model.fc
-    del model.last_linear
+    # del model.fc
+    # del model.last_linear
 
     def forward(self, x):
         x = self.conv1(x)
@@ -619,11 +619,15 @@ def modify_resnets_patrial_x_all(model):
         x2 = self.layer2(x1)
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
+
+        x_label = self.logits(x4)
+
         return {
             'x1': x1,
             'x2': x2,
             'x3': x3,
             'x4': x4,
+            'x_label': x_label,
         }
 
     setattr(model.__class__, 'forward', forward)

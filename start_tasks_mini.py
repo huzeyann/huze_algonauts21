@@ -41,8 +41,8 @@ for roi in rois:
     cloned_task_parameters['Args/rois'] = roi
     cloned_task_parameters['Args/track'] = 'mini_track'
     # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
-    cloned_task_parameters['Args/batch_size'] = 8
-    cloned_task_parameters['Args/accumulate_grad_batches'] = 4
+    cloned_task_parameters['Args/batch_size'] = 24 if roi != 'STS' else 20
+    cloned_task_parameters['Args/accumulate_grad_batches'] = 1
     cloned_task_parameters['Args/num_layers'] = 1
     cloned_task_parameters['Args/conv_size'] = 256
     cloned_task_parameters['Args/first_layer_hidden'] = 1024
