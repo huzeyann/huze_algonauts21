@@ -437,11 +437,11 @@ class Pyramid(nn.Module):
                         hparams, self.fc_input_dims[k], hparams['output_size'], part='last')})
 
         if hparams['fc_fusion'] == 'concat':
-            final_in_dim = hparams['layer_hidden'] * \
+            final_in_dim = hparams['first_layer_hidden'] * \
                            len(self.pathways) * \
                            len(self.pyramid_layers)
         elif hparams['fc_fusion'] == 'add' or hparams['fc_fusion'] == 'avg':
-            final_in_dim = hparams['layer_hidden']
+            final_in_dim = hparams['first_layer_hidden']
         else:
             NotImplementedError()
 
