@@ -449,6 +449,10 @@ class Pyramid(nn.Module):
             assert hparams['fc_fusion'] == 'concat'
             if 'vggish' in hparams['additional_features']:
                 final_in_dim += 3 * 128
+            if 'i3d_rgb' in hparams['additional_features']:
+                final_in_dim += 1024
+            if 'i3d_flow' in hparams['additional_features']:
+                final_in_dim += 1024
 
         self.final_fusion = FcFusion(fusion_type=hparams['fc_fusion'])
         # hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
