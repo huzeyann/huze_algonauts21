@@ -141,16 +141,17 @@ class AlgonautsDataset(Dataset):
 
     def __getitem__(self, index):
 
-        x = {'video': self.videos[index]}
-        additional_features = {af: self.features[af][index] for af in self.additional_features}
-        x.update(additional_features)
+        if self.train:
+            x = {'video': self.videos[index]}
+            additional_features = {af: self.features[af][index] for af in self.additional_features}
+            x.update(additional_features)
 
         y = self.fmris[index]
 
         if self.train:
             return x, y
         else:
-            return x
+            return y
 
 
 class AlgonautsDataModule(pl.LightningDataModule):
