@@ -34,7 +34,7 @@ for roi in rois:
                              name=template_task.name + f'{roi}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, 'none', 'pyramid', 'x2,x3,x4', 'x2_spp_max', 'x3_no', 'x4_avg'])
+    cloned_task.add_tags([roi, 'none', 'pyramid', 'x2,x3,x4', 'x2_spp', 'x3_no', 'x4_avg'])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
@@ -90,7 +90,7 @@ for roi in rois:
                              name=template_task.name + f'{roi}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, 'none', 'pyramid', 'x2,x3,x4', 'x2_spp_max', 'x3_no', 'x4_avg'])
+    cloned_task.add_tags([roi, 'none', 'pyramid', 'x2,x3,x4', 'x2_spp', 'x3_no', 'x4_avg'])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
@@ -137,7 +137,7 @@ for roi in rois:
                              name=template_task.name + f'{roi}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, 'none', 'pyramid', 'x2,x3,x4', 'x2_spp_max', 'x3_no', 'x4_avg'])
+    cloned_task.add_tags([roi, 'none', 'pyramid', 'x3', 'x3_no'])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
