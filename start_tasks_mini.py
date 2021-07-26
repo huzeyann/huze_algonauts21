@@ -126,6 +126,15 @@ for roi in rois:
     cloned_task_parameters['Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
     cloned_task_parameters['Args/voxel_wise'] = False
 
+    cloned_task.set_parameters(cloned_task_parameters)
+    print('Experiment set with parameters {}'.format(cloned_task_parameters))
+
+    # enqueue the task for execution
+    Task.enqueue(cloned_task.id, queue_name=queue)
+    print('Experiment id={} enqueue for execution'.format(cloned_task.id))
+
+    task_ids.append(cloned_task.id)
+
 
 
 rois = ['V1', 'V2', 'V3']
@@ -172,6 +181,15 @@ for roi in rois:
     cloned_task_parameters['Args/save_checkpoints'] = True
     cloned_task_parameters['Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
     cloned_task_parameters['Args/voxel_wise'] = False
+
+    cloned_task.set_parameters(cloned_task_parameters)
+    print('Experiment set with parameters {}'.format(cloned_task_parameters))
+
+    # enqueue the task for execution
+    Task.enqueue(cloned_task.id, queue_name=queue)
+    print('Experiment id={} enqueue for execution'.format(cloned_task.id))
+
+    task_ids.append(cloned_task.id)
 
 
 print(task_ids)
