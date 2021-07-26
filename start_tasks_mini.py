@@ -49,7 +49,7 @@ for roi in rois:
     cloned_task_parameters['Args/layer_hidden'] = 2048
     cloned_task_parameters['Args/debug'] = False
     cloned_task_parameters['Args/freeze_bn'] = True
-    cloned_task_parameters['Args/early_stop_epochs'] = 10
+    cloned_task_parameters['Args/early_stop_epochs'] = 5
     cloned_task_parameters['Args/max_epochs'] = 100
     cloned_task_parameters['Args/backbone_freeze_epochs'] = 4
     cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
@@ -105,7 +105,7 @@ for roi in rois:
     cloned_task_parameters['Args/layer_hidden'] = 2048
     cloned_task_parameters['Args/debug'] = False
     cloned_task_parameters['Args/freeze_bn'] = False
-    cloned_task_parameters['Args/early_stop_epochs'] = 10
+    cloned_task_parameters['Args/early_stop_epochs'] = 5
     cloned_task_parameters['Args/max_epochs'] = 100
     cloned_task_parameters['Args/backbone_freeze_epochs'] = 4
     cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
@@ -161,7 +161,7 @@ for roi in rois:
     cloned_task_parameters['Args/layer_hidden'] = 2048
     cloned_task_parameters['Args/debug'] = False
     cloned_task_parameters['Args/freeze_bn'] = False
-    cloned_task_parameters['Args/early_stop_epochs'] = 10
+    cloned_task_parameters['Args/early_stop_epochs'] = 5
     cloned_task_parameters['Args/max_epochs'] = 100
     cloned_task_parameters['Args/backbone_freeze_epochs'] = 4
     cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
