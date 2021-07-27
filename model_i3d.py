@@ -381,7 +381,7 @@ class Pyramid(nn.Module):
             'x1': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
             'x2': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
             'x3': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
-            'x4': np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]]),
+            'x4': np.array([[1, 1], [1, 3], [1, 3]]),
         }
         if self.is_pyramid:
             assert len(self.pathways) >= 1 and self.pathways[0] != 'none'
@@ -393,8 +393,10 @@ class Pyramid(nn.Module):
         self.first_fcs = nn.ModuleDict()
         self.aux_fcs = nn.ModuleDict()
 
-        self.debug_conv = nn.ModuleDict()
-        self.debug_conv.update({'x4': nn.Conv3d(2048, 256, kernel_size=1, stride=1)})
+        self.is_x_label = False
+        if 'x_label' in self.pyramid_layers:
+            self.pyramid_layers.remove('x_label')
+            self.is_x_label = True
 
         for x_i in self.pyramid_layers:
             for pathway in self.pathways:
@@ -427,6 +429,18 @@ class Pyramid(nn.Module):
                     self.fc_input_dims.update({k: np.sum(
                         self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][
                             2]) * self.planes})
+                elif self.pooling_modes[x_i] == 'adaptive_max':
+                    size = hparams['pooling_size']
+                    self.poolings.update({k: nn.Sequential(
+                        nn.AdaptiveMaxPool3d((None, size, size)),
+                        nn.Flatten())})
+                    self.fc_input_dims.update({k: self.planes * self.twh_dict[x_i][0] * size * size})
+                elif self.pooling_modes[x_i] == 'adaptive_avg':
+                    size = hparams['pooling_size']
+                    self.poolings.update({k: nn.Sequential(
+                        nn.AdaptiveAvgPool3d((None, size, size)),
+                        nn.Flatten())})
+                    self.fc_input_dims.update({k: self.planes * self.twh_dict[x_i][0] * size * size})
                 else:
                     NotImplementedError()
 
@@ -454,6 +468,9 @@ class Pyramid(nn.Module):
             if 'i3d_flow' in hparams['additional_features']:
                 final_in_dim += 1024
 
+        if self.is_x_label:
+            final_in_dim += 292
+
         self.final_fusion = FcFusion(fusion_type=hparams['fc_fusion'])
         # hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
         if self.hparams['track'] == 'mini_track':
@@ -465,6 +482,10 @@ class Pyramid(nn.Module):
                 self.response = build_fc(hparams, final_in_dim, hparams['output_size'])
 
     def forward(self, x, x_add):
+
+        if self.is_x_label:
+            x_label = x['x_label']
+
         # drop x (clone for parallel path)
         x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
         x = {k: self.first_convs[k](v) for k, v in x.items()}
@@ -478,8 +499,12 @@ class Pyramid(nn.Module):
             assert self.aux_heads == False
             x.update(x_add)
 
+        if self.is_x_label:
+            x.update({'x_label': x_label})
+
         if self.hparams['track'] == 'mini_track':
             out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else None
+            # print(self.final_fusion(x).shape, self.final_fc)
             out = self.final_fc(self.final_fusion(x))
             return out, out_aux
 

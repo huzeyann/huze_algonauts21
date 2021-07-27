@@ -18,7 +18,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts V2 flow',
+    project_name='Algonauts V2 adaptive_pooling search RF',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -104,6 +104,7 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--learning_rate', type=float, default=3e-4)
         parser.add_argument('--backbone_lr_ratio', type=float, default=0.1)
         parser.add_argument('--pooling_mode', type=str, default='avg')
+        parser.add_argument('--pooling_size', type=int, default=5)
         parser.add_argument('--x1_pooling_mode', type=str, default='spp')
         parser.add_argument('--x2_pooling_mode', type=str, default='spp')
         parser.add_argument('--x3_pooling_mode', type=str, default='spp')
