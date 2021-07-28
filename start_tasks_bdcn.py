@@ -68,7 +68,7 @@ for roi in rois:
                 cloned_task_parameters['Args/early_stop_epochs'] = 5
                 cloned_task_parameters['Args/max_epochs'] = 100
                 cloned_task_parameters['Args/backbone_freeze_epochs'] = 5
-                cloned_task_parameters['Args/bdcn_pool_kernel_size'] = bdcn_pool_size
+                cloned_task_parameters['Args/bdcn_pool_size'] = bdcn_pool_size
                 cloned_task_parameters['Args/backbone_lr_ratio'] = 1 / num_frame
                 cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
                 # cloned_task_parameters['Args/x1_pooling_mode'] = 'spp'

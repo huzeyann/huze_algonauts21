@@ -19,7 +19,7 @@ class BDCNNeck(nn.Module):
         self.num_bdcns = len(self.bdcn_outputs)
         assert self.num_bdcns == 1
 
-        self.pool_size = self.hparams.bdcn_pool_kernel_size
+        self.pool_size = self.hparams.bdcn_pool_size
         self.fc_in_dim = int((self.hparams.video_size / self.pool_size) ** 2 * 1 * self.hparams.video_frames)
 
         if self.hparams.pooling_mode == 'max':

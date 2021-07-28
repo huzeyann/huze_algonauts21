@@ -116,7 +116,7 @@ class LitModel(LightningModule):
         parser.add_argument('--fc_fusion', type=str, default='concat')
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--bdcn_outputs', type=str, default='-1')
-        parser.add_argument('--bdcn_pool_kernel_size', type=int, default=1)
+        parser.add_argument('--bdcn_pool_size', type=int, default=1)
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.25)
         parser.add_argument('--sample_voxels', default=False, action="store_true")
