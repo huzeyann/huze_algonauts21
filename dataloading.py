@@ -44,7 +44,15 @@ def load_video(file, num_frames, load_transform):
 
 class RGB2BGR(torch.nn.Module):
     def forward(self, tensor):
-        return tensor[::-1]
+        return torch.flip(tensor, [0])
+
+    def __repr__(self):
+        return self.__class__.__name__
+
+
+class TwoFiveFive(torch.nn.Module):
+    def forward(self, tensor):
+        return tensor * 255
 
     def __repr__(self):
         return self.__class__.__name__
@@ -70,6 +78,7 @@ def wrap_load_videos(root, file_lists, num_frames=16, resolution=288, preprocess
             transforms.ToTensor(),
             transforms.Normalize([0.4810938, 0.45752459, 0.40787055], [1, 1, 1]),
             RGB2BGR(),
+            TwoFiveFive(),
         ])
     else:
         NotImplementedError()
@@ -124,12 +133,14 @@ class AlgonautsDataset(Dataset):
             else:
                 self.videos = wrap_load_videos(os.path.join(self.dataset_dir, 'videos'),
                                                self.file_df['vid'].values,
-                                               self.num_frames, self.resolution)
+                                               self.num_frames, self.resolution,
+                                               preprocessing_type=self.preprocessing_type)
                 torch.save(self.videos, cache_file)
         else:
             self.videos = wrap_load_videos(os.path.join(self.dataset_dir, 'videos'),
                                            self.file_df['vid'].values,
-                                           self.num_frames, self.resolution)
+                                           self.num_frames, self.resolution,
+                                           preprocessing_type=self.preprocessing_type)
 
         # load freezed layers
         if self.additional_features:

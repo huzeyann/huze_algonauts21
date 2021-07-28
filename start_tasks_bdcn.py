@@ -28,18 +28,22 @@ task_ids = []
 # rois = ['STS', 'FFA', 'PPA', 'LOC', 'EBA', 'V2', 'V3', 'V4', 'V1']
 
 num_frames = [3, 8, 16]
-video_sizes = [32, 96, 224]
+video_sizes = [32, 64, 128]
 bdcn_pool_sizes = [1, 2, 4]
+rois = ['V1', 'EBA', 'V4', 'LOC']
 
-rois = ['V1', 'EBA', 'STS', 'FFA', 'V2', 'V3', 'V4', 'PPA', 'LOC']
+num_frames = [8, ]
+video_sizes = [64, 128]
+bdcn_pool_sizes = [1, 2, 4, 6, 8, 16]
 
+# rois = ['V1', 'EBA', 'STS', 'FFA', 'V2', 'V3', 'V4', 'PPA', 'LOC']
+rois = ['V1']
 for roi in rois:
     for num_frame in num_frames:
         for video_size in video_sizes:
             for bdcn_pool_size in bdcn_pool_sizes:
-
-                if video_sizes == 224:
-                    if num_frames == 16:
+                if video_sizes == 64:
+                    if bdcn_pool_size == 16:
                         continue
 
                 queue = next(queues_buffer)

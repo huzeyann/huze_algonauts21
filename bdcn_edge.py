@@ -23,9 +23,11 @@ class BDCNNeck(nn.Module):
         self.fc_in_dim = int((self.hparams.video_size / self.pool_size) ** 2 * 1 * self.hparams.video_frames)
 
         if self.hparams.pooling_mode == 'max':
-            pool = nn.MaxPool2d(kernel_size=self.pool_size, stride=self.pool_size)
+            # pool = nn.MaxPool2d(kernel_size=self.pool_size, stride=self.pool_size)
+            pool = nn.AdaptiveMaxPool2d(self.pool_size)
         elif self.hparams.pooling_mode == 'avg':
-            pool = nn.AvgPool2d(kernel_size=self.pool_size, stride=self.pool_size)
+            # pool = nn.AvgPool2d(kernel_size=self.pool_size, stride=self.pool_size)
+            pool = nn.AdaptiveAvgPool2d(self.pool_size)
         else:
             NotImplementedError()
 

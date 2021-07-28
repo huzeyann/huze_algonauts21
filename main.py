@@ -136,6 +136,8 @@ class LitModel(LightningModule):
         # x_add = {k: v for k, v in x.items() if k != 'video'}
 
         if self.hparams.backbone_type == 'bdcn_edge':
+            # if self.training == False:
+            #     self.logger.experiment.add_image('original', x_vid[0, :, -1, :, :], global_step=self.global_step, dataformats='CHW')
             # vid to img
             x_vid = x_vid.permute(0, 2, 1, 3, 4)
             s = x_vid.shape
@@ -146,6 +148,9 @@ class LitModel(LightningModule):
         if self.hparams.backbone_type == 'bdcn_edge':
             # img to vid
             out_vid = [x.reshape(s[0], s[1], s[3], s[4]) for x in out_vid]
+            # if self.training == False:
+            #     self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]), global_step=self.global_step, dataformats='HW')
+            #     self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
 
         # out = self.neck(out_vid, x_add)
         out = self.neck(out_vid)
