@@ -263,7 +263,7 @@ class LitModel(LightningModule):
             torch.save(val_corr, os.path.join(prediction_dir, f'voxel_vorrs-{self.global_step}.pt'))
 
             with torch.no_grad():
-                device = self.backbone.conv1.weight.device
+                device = self.backbone.conv1.weight.device  # TODO
                 prediction = []
                 for batch in self.trainer.datamodule.predict_dataloader():
                     out = self(batch.to(device))
