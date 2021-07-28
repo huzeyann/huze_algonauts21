@@ -42,7 +42,15 @@ def load_video(file, num_frames, load_transform):
     return vid
 
 
-def wrap_load_videos(root, file_lists, num_frames=16, resolution=288):
+class RGB2BGR(torch.nn.Module):
+    def forward(self, tensor):
+        return tensor[::-1]
+
+    def __repr__(self):
+        return self.__class__.__name__
+
+
+def wrap_load_videos(root, file_lists, num_frames=16, resolution=288, preprocessing_type='mmit'):
     # load all to memory
 
     # t = nn.Sequential(
@@ -50,10 +58,21 @@ def wrap_load_videos(root, file_lists, num_frames=16, resolution=288):
     #                              [0.229, 0.224, 0.225]),
     #
     # )
-    resize_normalize = transforms.Compose([
-        transforms.Resize((resolution, resolution)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+    if preprocessing_type == 'mmit':
+        resize_normalize = transforms.Compose([
+            transforms.Resize((resolution, resolution)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+    elif preprocessing_type == 'bdcn':
+        resize_normalize = transforms.Compose([
+            transforms.Resize((resolution, resolution)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.4810938, 0.45752459, 0.40787055], [1, 1, 1]),
+            RGB2BGR(),
+        ])
+    else:
+        NotImplementedError()
 
     vids = []
     for file in tqdm(file_lists):
@@ -78,7 +97,9 @@ class AlgonautsDataset(Dataset):
                  additional_features='',
                  additional_features_dir='',
                  rois='EBA', num_frames=16, resolution=288,
-                 train=True, cached=True, track='mini_track', subs='all'):
+                 train=True, cached=True, track='mini_track', subs='all',
+                 preprocessing_type='mmit'):
+        self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
         self.additional_features = additional_features
         self.resolution = resolution
@@ -97,7 +118,7 @@ class AlgonautsDataset(Dataset):
         # load video
         if self.cached:  # this can get big
             cache_dir = '/home/huze/.cache/'
-            cache_file = cache_dir + f'videos_{self.num_frames}_{self.resolution}_{self.train}.pt'
+            cache_file = cache_dir + f'videos_{self.num_frames}_{self.resolution}_{self.preprocessing_type}_{self.train}.pt'
             if os.path.exists(cache_file):
                 self.videos = torch.load(cache_file)
             else:
@@ -128,9 +149,10 @@ class AlgonautsDataset(Dataset):
                     fmri = wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
                                            self.file_df[roi].values)
                     self.fmris.append(fmri)
-                self.fmris, self.idx_ends = concat_and_mask([wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
-                                                                             self.file_df[roi].values)
-                                                             for roi in self.rois.split(',')])
+                self.fmris, self.idx_ends = concat_and_mask(
+                    [wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
+                                     self.file_df[roi].values)
+                     for roi in self.rois.split(',')])
             elif self.track == 'full_track':
                 self.fmris, self.idx_ends = concat_and_mask(
                     [wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'), self.file_df[sub].values)
@@ -168,8 +190,10 @@ class AlgonautsDataModule(pl.LightningDataModule):
                  random_split=False,
                  use_cv=False,
                  num_split=None,
-                 fold=-1, ):
+                 fold=-1,
+                 preprocessing_type='mmit'):
         super().__init__()
+        self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
         self.additional_features = additional_features
         self.fold = fold
@@ -208,7 +232,8 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 resolution=self.resolution,
                 cached=self.cached,
                 track=self.track,
-                subs=self.subs
+                subs=self.subs,
+                preprocessing_type=self.preprocessing_type,
             )
 
             if not self.use_cv:
@@ -244,7 +269,8 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 resolution=self.resolution,
                 cached=self.cached,
                 track=self.track,
-                subs=self.subs
+                subs=self.subs,
+                preprocessing_type=self.preprocessing_type,
             )
             self.num_voxels = getattr(self, 'num_voxels')
 

@@ -352,10 +352,10 @@ class ConvResponseModel(nn.Module):
         return x
 
 
-class Pyramid(nn.Module):
+class I3d_rgb(nn.Module):
 
     def __init__(self, hparams):
-        super(Pyramid, self).__init__()
+        super(I3d_rgb, self).__init__()
         assert hparams['fc_fusion'] in ['concat', 'add', 'avg']
         self.hparams = hparams
         self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
@@ -481,7 +481,7 @@ class Pyramid(nn.Module):
             else:
                 self.response = build_fc(hparams, final_in_dim, hparams['output_size'])
 
-    def forward(self, x, x_add):
+    def forward(self, x):
 
         if self.is_x_label:
             x_label = x['x_label']
@@ -494,10 +494,10 @@ class Pyramid(nn.Module):
         x = {k: self.poolings[k](v) for k, v in x.items()}
         x = {k: self.first_fcs[k](v) for k, v in x.items()}
 
-        if len(x_add) > 0:
-            assert self.hparams['additional_features'] != ''
-            assert self.aux_heads == False
-            x.update(x_add)
+        # if len(x_add) > 0:
+        #     assert self.hparams['additional_features'] != ''
+        #     assert self.aux_heads == False
+        #     x.update(x_add)
 
         if self.is_x_label:
             x.update({'x_label': x_label})
@@ -570,63 +570,6 @@ def modify_resnets(model):
     # Modify methods
     setattr(model.__class__, 'features', features)
     setattr(model.__class__, 'logits', logits)
-    setattr(model.__class__, 'forward', forward)
-    return model
-
-
-def modify_resnets_patrial_x3(model):
-    del model.fc
-    del model.last_linear
-    del model.layer4
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        return x
-
-    setattr(model.__class__, 'forward', forward)
-    return model
-
-
-def modify_resnets_patrial_x4(model):
-    del model.fc
-    del model.last_linear
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        return x
-
-    setattr(model.__class__, 'forward', forward)
-    return model
-
-
-def modify_resnets_patrial_x2(model):
-    del model.fc
-    del model.last_linear
-    del model.layer3
-    del model.layer4
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        return x
-
     setattr(model.__class__, 'forward', forward)
     return model
 

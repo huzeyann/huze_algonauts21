@@ -9,6 +9,8 @@ from pytorch_lightning.plugins import DDPPlugin
 from torch import Tensor
 from torch.nn import SyncBatchNorm
 
+from bdcn import BDCN, load_bdcn
+from bdcn_edge import BDCNNeck
 from dataloading import AlgonautsDataModule
 from model_i3d import *
 from sam import SAM
@@ -18,7 +20,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts V2 adaptive_pooling search RF',
+    project_name='debug',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -52,10 +54,10 @@ class DataAugmentation(nn.Module):
         return x_out
 
 
-class LitI3DFC(LightningModule):
+class LitModel(LightningModule):
 
     def __init__(self, backbone, hparams: dict, *args, **kwargs):
-        super(LitI3DFC, self).__init__()
+        super(LitModel, self).__init__()
         self.save_hyperparameters(hparams)
         # self.hparams = hparams
         self.lr = self.hparams.learning_rate
@@ -69,10 +71,12 @@ class LitI3DFC(LightningModule):
 
         # self.backbone = nn.SyncBatchNorm.convert_sync_batchnorm(backbone) # slooooow
 
-        if self.hparams.backbone_type == 'all':
-            self.neck = Pyramid(hparams)
+        if self.hparams.backbone_type == 'i3d_rgb':
+            self.neck = I3d_rgb(self.hparams)
+        elif self.hparams.backbone_type == 'bdcn_edge':
+            self.neck = BDCNNeck(self.hparams)
         else:
-            self.neck = MiniFC(hparams)
+            NotImplementedError()
 
         if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
             # voxel mask
@@ -87,7 +91,7 @@ class LitI3DFC(LightningModule):
             self.voxel_masks = torch.stack(voxel_masks, 0)
 
         if self.hparams.voxel_wise:
-            # record each step every voxel
+            # record each validation step for every voxel
             self.recored_voxel_corrs = None
             self.recored_predictions = None
 
@@ -111,6 +115,8 @@ class LitI3DFC(LightningModule):
         parser.add_argument('--x4_pooling_mode', type=str, default='spp')
         parser.add_argument('--fc_fusion', type=str, default='concat')
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
+        parser.add_argument('--bdcn_outputs', type=str, default='-1')
+        parser.add_argument('--bdcn_pool_kernel_size', type=int, default=1)
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.25)
         parser.add_argument('--sample_voxels', default=False, action="store_true")
@@ -127,12 +133,22 @@ class LitI3DFC(LightningModule):
 
     def forward(self, x):
         x_vid = x['video']
-        x_add = {k: v for k, v in x.items() if k != 'video'}
-        # print('x_vid', x_vid.dtype, x_vid.device)
-        # print(x_add)
-        # print('x_add', x_add['vggish'].dtype, x_add['vggish'].device)
+        # x_add = {k: v for k, v in x.items() if k != 'video'}
+
+        if self.hparams.backbone_type == 'bdcn_edge':
+            # vid to img
+            x_vid = x_vid.permute(0, 2, 1, 3, 4)
+            s = x_vid.shape
+            x_vid = x_vid.reshape(s[0] * s[1], *s[2:])
+
         out_vid = self.backbone(x_vid)
-        out = self.neck(out_vid, x_add)
+
+        if self.hparams.backbone_type == 'bdcn_edge':
+            # img to vid
+            out_vid = [x.reshape(s[0], s[1], s[3], s[4]) for x in out_vid]
+
+        # out = self.neck(out_vid, x_add)
+        out = self.neck(out_vid)
         return out
 
     def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
@@ -284,21 +300,6 @@ class LitI3DFC(LightningModule):
                 'lr': self.hparams.learning_rate,
             },
         ]
-        # optimizer_grouped_parameters = filter(lambda p: p.requires_grad, self.parameters())
-        # optimizer_grouped_parameters = [
-        #     {
-        #         "params": [p for p in self.backbone.parameters()],
-        #         "lr": 1e-4,
-        #     },
-        #     {
-        #         "params": [p for p in self.conv31.parameters()],
-        #         "lr": 3e-4,
-        #     },
-        #     {
-        #         "params": [p for p in self.fc.parameters()],
-        #         "lr": 3e-4,
-        #     },
-        # ]
         if not self.hparams.asm:
             optimizer = AdaBelief(optimizer_grouped_parameters)
             # optimizer = SGD(optimizer_grouped_parameters, lr=self.lr, momentum=0.9, weight_decay=self.hparams.weight_decay)
@@ -318,7 +319,8 @@ def train(args):
                              random_split=args.val_random_split,
                              use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold,
                              additional_features_dir=args.additional_features_dir,
-                             additional_features=args.additional_features)
+                             additional_features=args.additional_features,
+                             preprocessing_type=args.preprocessing_type)
     dm.setup()
 
     checkpoint_callback = ModelCheckpoint(
@@ -349,14 +351,10 @@ def train(args):
     if args.debug:
         torch.set_printoptions(10)
 
-    if args.backbone_type == 'x3':
-        backbone = modify_resnets_patrial_x3(multi_resnet3d50(cache_dir=args.cache_dir))
-    elif args.backbone_type == 'x4':
-        backbone = modify_resnets_patrial_x4(multi_resnet3d50(cache_dir=args.cache_dir))
-    elif args.backbone_type == 'x2':
-        backbone = modify_resnets_patrial_x2(multi_resnet3d50(cache_dir=args.cache_dir))
-    elif args.backbone_type == 'all':
+    if args.backbone_type == 'i3d_rgb':
         backbone = modify_resnets_patrial_x_all(multi_resnet3d50(cache_dir=args.cache_dir))
+    elif args.backbone_type == 'bdcn_edge':
+        backbone = load_bdcn(args.bdcn_path)
     else:
         NotImplementedError()
 
@@ -385,13 +383,13 @@ def train(args):
         if not os.path.exists(prediction_dir):
             os.system(f'mkdir {prediction_dir}')
 
-    plmodel = LitI3DFC(backbone, hparams)
+    plmodel = LitModel(backbone, hparams)
 
     trainer.fit(plmodel, datamodule=dm)
 
     if not args.voxel_wise:
         if args.save_checkpoints:
-            plmodel = LitI3DFC.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
+            plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
                                                     hparams=hparams)
             prediction = trainer.predict(plmodel, datamodule=dm)
             torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
@@ -408,10 +406,12 @@ if __name__ == '__main__':
     parser.add_argument('--accumulate_grad_batches', type=int, default=1)
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
+    parser.add_argument('--bdcn_path', type=str,
+                        default='/home/huze/my_algonauts/bdcn-final-model/bdcn_pretrained_on_bsds500.pth')
     parser.add_argument('--additional_features', type=str, default='')
     parser.add_argument('--additional_features_dir', type=str, default='/data_smr/huze/projects/my_algonauts/features/')
     parser.add_argument('--track', type=str, default='mini_track')
-    parser.add_argument('--backbone_type', type=str, default='x3')
+    parser.add_argument('--backbone_type', type=str, default='i3d_rgb', help='i3d_rgb, bdcn_edge')
     parser.add_argument('--rois', type=str, default="EBA")
     parser.add_argument('--subs', type=str, default="all")
     parser.add_argument('--num_subs', type=int, default=10)
@@ -423,6 +423,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
     parser.add_argument('--use_cv', default=False, action="store_true")
     parser.add_argument('--fold', type=int, default=-1)
+    parser.add_argument('--preprocessing_type', type=str, default='mmit', help='mmit, bdcn')
     parser.add_argument('--early_stop_epochs', type=int, default=10)
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")
@@ -431,7 +432,7 @@ if __name__ == '__main__':
     parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
 
-    parser = LitI3DFC.add_model_specific_args(parser)
+    parser = LitModel.add_model_specific_args(parser)
     args = parser.parse_args()
 
     train(args)
