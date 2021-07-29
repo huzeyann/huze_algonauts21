@@ -21,6 +21,7 @@ class BDCNNeck(nn.Module):
 
         self.pool_size = self.hparams.bdcn_pool_size
         self.fc_in_dim = int(self.pool_size ** 2 * 1 * self.hparams.video_frames)
+        self.lstm_in_dim = int(self.pool_size ** 2 * 1)
 
         if self.hparams.pooling_mode == 'max':
             # pool = nn.MaxPool2d(kernel_size=self.pool_size, stride=self.pool_size)
@@ -34,16 +35,20 @@ class BDCNNeck(nn.Module):
         self.read_out_layers = nn.Sequential(
             nn.Sigmoid(),
             pool,
-            nn.Flatten(),
         )
 
-        self.fc = build_fc(hparams, self.fc_in_dim, hparams['output_size'])
+        self.lstm = nn.LSTM(input_size=self.lstm_in_dim, hidden_size=self.hparams.layer_hidden,
+                            num_layers=self.hparams.lstm_layers, batch_first=True)
+
+        self.fc = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames, hparams['output_size'])
 
     def forward(self, x):
-        # x: (None, C, D, H, W)
+        # x: (None, D, H, W)
         x = x[self.bdcn_outputs[0]]
-        # print(x.shape)
         x = self.read_out_layers(x)
-        out = self.fc(x)
+        x = x.reshape(x.shape[0], x.shape[1], -1)
+        x = self.lstm(x)[0]
+        # print(x.shape)
+        out = self.fc(x.reshape(x.shape[0], -1))
         out_aux = None
         return out, out_aux

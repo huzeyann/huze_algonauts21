@@ -20,7 +20,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts BDCN debug',
+    project_name='debug',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -117,6 +117,7 @@ class LitModel(LightningModule):
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--bdcn_outputs', type=str, default='-1')
         parser.add_argument('--bdcn_pool_size', type=int, default=1)
+        parser.add_argument('--lstm_layers', type=int, default=1)
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.25)
         parser.add_argument('--sample_voxels', default=False, action="store_true")
@@ -150,7 +151,7 @@ class LitModel(LightningModule):
             out_vid = [x.reshape(s[0], s[1], s[3], s[4]) for x in out_vid]
             # if self.training == False:
             #     self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]), global_step=self.global_step, dataformats='HW')
-            #     self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
+                # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
 
         # out = self.neck(out_vid, x_add)
         out = self.neck(out_vid)
