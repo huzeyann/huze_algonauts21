@@ -498,7 +498,7 @@ class I3d_rgb(nn.Module):
         if self.is_pyramid:
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
         x = {k: self.poolings[k](v) for k, v in x.items()}
-        x = {k: self.ch_response[k](v) for k, v in x.items()}
+        out_aux = {k: self.ch_response[k](v) for k, v in x.items()}
 
         # if len(x_add) > 0:
         #     assert self.hparams['additional_features'] != ''
@@ -507,7 +507,6 @@ class I3d_rgb(nn.Module):
         # if self.is_x_label:
         #     x.update({'x_label': x_label})
 
-        out_aux = {k: self.ch_response[k](v) for k, v in x.items()} if self.aux_heads else None
         out = self.final_fusion(out_aux)
         return out, out_aux
 
