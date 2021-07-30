@@ -72,6 +72,7 @@ class ReduceAuxLossWeight(Callback):
             reduce_ratio=0.01,
             min_delta: float = 0.0,
             patience: int = 3,
+            reduce_max_times: int = 2,
             verbose: bool = False,
             mode: str = 'min',
             strict: bool = True,
@@ -81,6 +82,7 @@ class ReduceAuxLossWeight(Callback):
             check_on_train_epoch_end: bool = False,
     ):
         super().__init__()
+        self.reduce_max_times = reduce_max_times
         self.reduce_ratio = reduce_ratio
         self.aux_name = aux_name
         self.monitor = monitor
@@ -93,6 +95,7 @@ class ReduceAuxLossWeight(Callback):
         self.stopping_threshold = stopping_threshold
         self.divergence_threshold = divergence_threshold
         self.wait_count = 0
+        self.reduced_count = 0
         self.reduced_epoch = 0
         self._check_on_train_epoch_end = check_on_train_epoch_end
 
@@ -178,7 +181,10 @@ class ReduceAuxLossWeight(Callback):
         # stop every ddp process if any world process decides to stop
         should_stop = trainer.training_type_plugin.reduce_boolean_decision(should_stop)
         if should_stop:
-            pl_module.aux_loss_weights[self.aux_name] = pl_module.aux_loss_weights[self.aux_name] * self.reduce_ratio
+            if self.reduced_count >= self.reduce_max_times:
+                pl_module.aux_loss_weights[self.aux_name] = 0
+            else:
+                pl_module.aux_loss_weights[self.aux_name] = pl_module.aux_loss_weights[self.aux_name] * self.reduce_ratio
             # print(self.aux_name, "should stop")
         # else:
             # print(self.aux_name, "should not stop")
@@ -224,6 +230,7 @@ class ReduceAuxLossWeight(Callback):
                     f" Best score: {self.best_score:.3f}. Signaling Trainer to stop."
                 )
                 self.wait_count = 0
+                self.reduced_count += 1
 
         return should_stop, reason
 
