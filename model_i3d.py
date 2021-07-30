@@ -466,16 +466,18 @@ class I3d_rgb(nn.Module):
                             2]) * self.planes})
                 elif self.pooling_modes[x_i] == 'adaptive_max':
                     size = hparams[f'pooling_size_{x_i}']
+                    size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
                     self.poolings.update({k: nn.Sequential(
-                        nn.AdaptiveMaxPool3d((None, size, size)),
+                        nn.AdaptiveMaxPool3d((size_t, size, size)),
                         nn.Flatten())})
-                    self.fc_input_dims.update({k: self.planes * self.twh_dict[x_i][0] * size * size})
+                    self.fc_input_dims.update({k: self.planes * size_t * size * size})
                 elif self.pooling_modes[x_i] == 'adaptive_avg':
                     size = hparams[f'pooling_size_{x_i}']
+                    size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
                     self.poolings.update({k: nn.Sequential(
-                        nn.AdaptiveAvgPool3d((None, size, size)),
+                        nn.AdaptiveAvgPool3d((size_t, size, size)),
                         nn.Flatten())})
-                    self.fc_input_dims.update({k: self.planes * self.twh_dict[x_i][0] * size * size})
+                    self.fc_input_dims.update({k: self.planes * size_t * size * size})
                 else:
                     NotImplementedError()
 
