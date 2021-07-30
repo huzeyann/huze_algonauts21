@@ -48,7 +48,7 @@ DEVICE = execution_queue.split('-')[-1]
 
 task = Task.init(project_name=PROJECT_NAME,
                  task_name=f"{TASK_NAME},{args.roi},{args.layer}",
-                 # task_type=Task.TaskTypes.optimizer,
+                 task_type=Task.TaskTypes.optimizer,
                  reuse_last_task_id=False)
 task.connect(args)
 template_taskid = Task.get_task(project_name=PROJECT_NAME, task_name=BASE_TASK).id
