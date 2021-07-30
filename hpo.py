@@ -133,10 +133,10 @@ a_optimizer = HyperParameterOptimizer(
     total_max_jobs=total_max_jobs,
     # set the minimum number of iterations for an experiment, before early stopping.
     # Does not apply for simple strategies such as RandomSearch or GridSearch
-    min_iteration_per_job=10,
+    # min_iteration_per_job=10,
     # Set the maximum number of iterations for an experiment to execute
     # (This is optional, unless using OptimizerBOHB where this is a must)
-    max_iteration_per_job=100,
+    # max_iteration_per_job=100,
     # optimizer_kwargs={'local_port': LOCAL_PORT},
     local_port=args.local_port,
 )
