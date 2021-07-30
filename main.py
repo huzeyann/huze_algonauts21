@@ -346,7 +346,7 @@ def train(args):
 
     early_stop_callback = EarlyStopping(
         monitor='val_corr/final',
-        min_delta=0.00,
+        min_delta=0.001,
         patience=int(args.early_stop_epochs / args.val_check_interval),
         verbose=False,
         mode='max'
@@ -366,8 +366,10 @@ def train(args):
                     monitor=f'val_corr/{k}',
                     aux_name=k,
                     reduce_ratio=args.reduce_aux_loss_ratio,
+                    reduce_max_counts=int(math.log(0.001, args.reduce_aux_loss_ratio) + 1),
                     mode='max',
-                    patience=3,
+                    min_delta=0.01,
+                    patience=2,
                     verbose=False,
                 )
                 callbacks.append(callback)

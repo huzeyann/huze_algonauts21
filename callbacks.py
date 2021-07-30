@@ -72,7 +72,7 @@ class ReduceAuxLossWeight(Callback):
             reduce_ratio=0.01,
             min_delta: float = 0.0,
             patience: int = 3,
-            reduce_max_times: int = 2,
+            reduce_max_counts: int = 2,
             verbose: bool = False,
             mode: str = 'min',
             strict: bool = True,
@@ -82,7 +82,7 @@ class ReduceAuxLossWeight(Callback):
             check_on_train_epoch_end: bool = False,
     ):
         super().__init__()
-        self.reduce_max_times = reduce_max_times
+        self.reduce_max_counts = reduce_max_counts
         self.reduce_ratio = reduce_ratio
         self.aux_name = aux_name
         self.monitor = monitor
@@ -103,6 +103,10 @@ class ReduceAuxLossWeight(Callback):
             raise MisconfigurationException(f"`mode` can be {', '.join(self.mode_dict.keys())}, got {self.mode}")
 
         self.min_delta *= 1 if self.monitor_op == torch.gt else -1
+        torch_inf = torch.tensor(np.Inf)
+        self.best_score = torch_inf if self.monitor_op == torch.lt else -torch_inf
+
+    def reset_score(self):
         torch_inf = torch.tensor(np.Inf)
         self.best_score = torch_inf if self.monitor_op == torch.lt else -torch_inf
 
@@ -181,7 +185,7 @@ class ReduceAuxLossWeight(Callback):
         # stop every ddp process if any world process decides to stop
         should_stop = trainer.training_type_plugin.reduce_boolean_decision(should_stop)
         if should_stop:
-            if self.reduced_count >= self.reduce_max_times:
+            if self.reduced_count > self.reduce_max_counts:
                 pl_module.aux_loss_weights[self.aux_name] = 0
             else:
                 pl_module.aux_loss_weights[self.aux_name] = pl_module.aux_loss_weights[self.aux_name] * self.reduce_ratio
@@ -231,6 +235,7 @@ class ReduceAuxLossWeight(Callback):
                 )
                 self.wait_count = 0
                 self.reduced_count += 1
+                self.reset_score()
 
         return should_stop, reason
 
