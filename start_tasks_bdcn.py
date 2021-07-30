@@ -46,12 +46,14 @@ for num_frame in num_frames:
 
                         queue = next(queues_buffer)
 
+                        tags = [roi, f'{num_frame}_fms', f'{video_size}_reso',
+                                f'{bdcn_pool_size}_p', pooling_mode, str(layer_hidden)]
+
                         cloned_task = Task.clone(source_task=template_task,
-                                                 name=template_task.name + f'{roi}',
+                                                 name=','.join(tags),
                                                  parent=template_task.id)
 
-                        cloned_task.add_tags([roi, f'{num_frame}_fms', f'{video_size}_reso',
-                                              f'{bdcn_pool_size}_p', pooling_mode, str(layer_hidden)])
+                        cloned_task.add_tags(tags)
 
                         cloned_task_parameters = cloned_task.get_parameters()
                         # cloned_task_parameters['rois'] = [roi]
@@ -108,12 +110,14 @@ for num_frame in num_frames:
 
                         queue = next(queues_buffer)
 
+                        tags = [roi, f'{num_frame}_fms', f'{video_size}_reso',
+                                f'{bdcn_pool_size}_p', pooling_mode, str(layer_hidden)]
+
                         cloned_task = Task.clone(source_task=template_task,
-                                                 name=template_task.name + f'{roi}',
+                                                 name=','.join(tags),
                                                  parent=template_task.id)
 
-                        cloned_task.add_tags([roi, f'{num_frame}_fms', f'{video_size}_reso',
-                                              f'{bdcn_pool_size}_p', pooling_mode, str(layer_hidden)])
+                        cloned_task.add_tags(tags)
 
                         cloned_task_parameters = cloned_task.get_parameters()
                         # cloned_task_parameters['rois'] = [roi]
