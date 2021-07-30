@@ -282,7 +282,8 @@ class LitModel(LightningModule):
                     outs.append(out_aux[k])
                 outs = torch.cat(outs, 0)
                 aux_val_corr = vectorized_correlation(outs, val_ys).mean()
-                self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f'val_corr/{k}', aux_val_corr, prog_bar=False, logger=True, sync_dist=True)
+                self.log(f'aux_lw/{k}', self.aux_loss_weights[k], prog_bar=False, logger=True, sync_dist=True)
 
         # print(self.aux_loss_weights)
 
