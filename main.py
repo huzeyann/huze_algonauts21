@@ -283,6 +283,8 @@ class LitModel(LightningModule):
                 aux_val_corr = vectorized_correlation(outs, val_ys).mean()
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
+        print(self.aux_loss_weights)
+
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
         no_decay = ["bias", "BatchNorm3D.weight", "BatchNorm1D.weight", "BatchNorm2D.weight"]
