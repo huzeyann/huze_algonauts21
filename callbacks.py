@@ -177,7 +177,11 @@ class ReduceAuxLossWeight(Callback):
 
         # stop every ddp process if any world process decides to stop
         should_stop = trainer.training_type_plugin.reduce_boolean_decision(should_stop)
-        pl_module.aux_loss_weights[self.aux_name] = pl_module.aux_loss_weights[self.aux_name] * self.reduce_ratio
+        if should_stop:
+            pl_module.aux_loss_weights[self.aux_name] = pl_module.aux_loss_weights[self.aux_name] * self.reduce_ratio
+            print(self.aux_name, "should stop")
+        else:
+            print(self.aux_name, "should not stop")
         if should_stop:
             self.reduced_epoch = trainer.current_epoch
         if reason and self.verbose:
