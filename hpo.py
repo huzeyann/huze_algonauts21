@@ -70,10 +70,11 @@ def job_complete_callback(
     res = {
         'roi': args.roi,
         'layer': args.layer,
-        'pool_rf': job_parameters['Args/pooling_size_{args.layer}'],
+        'pool_rf': job_parameters[f'Args/pooling_size_{args.layer}'],
         'objective_value': objective_value,
     }
-    RES_DF.append(res, ignore_index=True)
+    global RES_DF
+    RES_DF = RES_DF.append(res, ignore_index=True)
     RES_DF.to_csv(CSV_PATH)
     if job_id == top_performance_job_id:
         print('WOOT WOOT we broke the record! Objective reached {}'.format(objective_value))
@@ -81,6 +82,7 @@ def job_complete_callback(
 
 
 pool_size_max = 14 if args.layer != 'x4' else 9
+total_max_jobs = 12 if args.layer != 'x4' else 8
 pool_mode = 'adaptive_max' if args.layer != 'x4' else 'adaptive_avg'
 
 a_optimizer = HyperParameterOptimizer(
@@ -101,8 +103,8 @@ a_optimizer = HyperParameterOptimizer(
         DiscreteParameterRange('Args/pyramid_layers', values=[args.layer]),
     ],
     # this is the objective metric we want to maximize/minimize
-    objective_metric_title='correlation',
-    objective_metric_series='validation',
+    objective_metric_title='validation',
+    objective_metric_series='correlation',
     # now we decide if we want to maximize it or minimize it (accuracy we maximize)
     objective_metric_sign='max_global',
     # let us limit the number of concurrent experiments,
@@ -128,7 +130,7 @@ a_optimizer = HyperParameterOptimizer(
     # set the maximum number of jobs to launch for the optimization, default (None) unlimited
     # If OptimizerBOHB is used, it defined the maximum budget in terms of full jobs
     # basically the cumulative number of iterations will not exceed total_max_jobs * max_iteration_per_job
-    total_max_jobs=8,
+    total_max_jobs=total_max_jobs,
     # set the minimum number of iterations for an experiment, before early stopping.
     # Does not apply for simple strategies such as RandomSearch or GridSearch
     min_iteration_per_job=10,
