@@ -235,6 +235,8 @@ class ReduceAuxLossWeight(Callback):
                 )
                 self.wait_count = 0
                 self.reduced_count += 1
+                self.min_delta *= self.reduce_ratio
+                self.patience *= 2
                 self.reset_score()
 
         return should_stop, reason
