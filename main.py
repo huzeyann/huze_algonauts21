@@ -364,7 +364,7 @@ def train(args):
                     reduce_ratio=args.reduce_aux_loss_ratio,
                     mode='max',
                     patience=3,
-                    verbose=True,
+                    verbose=False,
                 )
                 callbacks.append(callback)
 
