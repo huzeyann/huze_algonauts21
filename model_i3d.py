@@ -388,7 +388,6 @@ class I3d_rgb(nn.Module):
 
     def __init__(self, hparams):
         super(I3d_rgb, self).__init__()
-        assert hparams['final_fusion'] in ['concat', 'add', 'avg']
         self.hparams = hparams
         self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
         self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
@@ -462,13 +461,13 @@ class I3d_rgb(nn.Module):
                         self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][
                             2]) * self.planes})
                 elif self.pooling_modes[x_i] == 'adaptive_max':
-                    size = hparams['pooling_size']
+                    size = hparams[f'pooling_size_{x_i}']
                     self.poolings.update({k: nn.Sequential(
                         nn.AdaptiveMaxPool3d((None, size, size)),
                         nn.Flatten())})
                     self.fc_input_dims.update({k: self.planes * self.twh_dict[x_i][0] * size * size})
                 elif self.pooling_modes[x_i] == 'adaptive_avg':
-                    size = hparams['pooling_size']
+                    size = hparams[f'pooling_size_{x_i}']
                     self.poolings.update({k: nn.Sequential(
                         nn.AdaptiveAvgPool3d((None, size, size)),
                         nn.Flatten())})

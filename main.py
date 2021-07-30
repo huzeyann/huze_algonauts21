@@ -8,8 +8,9 @@ from pytorch_lightning.core.lightning import LightningModule
 from pytorch_lightning.plugins import DDPPlugin
 from torch import Tensor
 from torch.nn import SyncBatchNorm
+from callbacks import ReduceAuxLossWeight
 
-from bdcn import BDCN, load_bdcn
+from bdcn import load_bdcn
 from bdcn_edge import BDCNNeck
 from dataloading import AlgonautsDataModule
 from model_i3d import *
@@ -90,6 +91,13 @@ class LitModel(LightningModule):
             print('voxel_mask in ', self.device)
             self.voxel_masks = torch.stack(voxel_masks, 0)
 
+        # aux reduction
+        l = len(self.hparams.pyramid_layers.split(',')) * len(self.hparams.pathways.split(','))
+
+        self.aux_loss_weights = {}
+        for x_i in self.hparams.pyramid_layers.split(','):
+            for pathway in self.hparams.pathways.split(','):
+                self.aux_loss_weights[f'{pathway}_{x_i}'] = self.hparams.aux_loss_weight
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -109,13 +117,18 @@ class LitModel(LightningModule):
         parser.add_argument('--x2_pooling_mode', type=str, default='spp')
         parser.add_argument('--x3_pooling_mode', type=str, default='spp')
         parser.add_argument('--x4_pooling_mode', type=str, default='spp')
+        parser.add_argument('--pooling_size_x1', type=int, default=5)
+        parser.add_argument('--pooling_size_x2', type=int, default=5)
+        parser.add_argument('--pooling_size_x3', type=int, default=5)
+        parser.add_argument('--pooling_size_x4', type=int, default=5)
         parser.add_argument('--final_fusion', type=str, default='concat')
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--bdcn_outputs', type=str, default='-1')
         parser.add_argument('--bdcn_pool_size', type=int, default=1)
         parser.add_argument('--lstm_layers', type=int, default=1)
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
-        parser.add_argument('--aux_loss_weight', type=float, default=0.25)
+        parser.add_argument('--aux_loss_weight', type=float, default=0.0)
+        parser.add_argument('--reduce_aux_loss_ratio', type=float, default=-1)
         parser.add_argument('--sample_voxels', default=False, action="store_true")
         parser.add_argument('--sample_num_voxels', type=int, default=1000)
         parser.add_argument('--freeze_bn', default=False, action="store_true")
@@ -162,16 +175,17 @@ class LitModel(LightningModule):
                 aux_losses = []
                 for k, oa in out_aux.items():
                     loss_aux = F.mse_loss(oa, y)
-                    aux_losses.append(loss_aux)
                     if is_log:
                         self.log(f'{prefix}_mse_loss/{k}', loss_aux,
-                                 on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                loss_aux = torch.stack(aux_losses).sum() * self.hparams.aux_loss_weight
+                                 on_step=False, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+                    loss_aux *= self.aux_loss_weights[k]
+                    aux_losses.append(loss_aux)
+                loss_aux = torch.stack(aux_losses).mean()
             else:
                 loss_aux = 0
             if is_log:
                 self.log(f'{prefix}_mse_loss/final', loss,
-                         on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                         on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             all_loss = loss + loss_aux
             return out, all_loss, out_aux
         elif self.hparams.track == 'full_track':
@@ -190,7 +204,7 @@ class LitModel(LightningModule):
                 loss = F.mse_loss(out_voxels, y)
             if is_log:
                 self.log(f'{prefix}_mse_loss/final', loss,
-                         on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=False)
+                         on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=False)
             return out_voxels, loss, None
 
     def training_step(self, batch, batch_idx):
@@ -339,6 +353,21 @@ def train(args):
     )
 
     callbacks = [early_stop_callback, finetune_callback]
+
+    if args.reduce_aux_loss_ratio >= 0:
+        for x_i in args.pyramid_layers.split(','):
+            for pathway in args.pathways.split(','):
+                k = f'{pathway}_{x_i}'
+                callback = ReduceAuxLossWeight(
+                    monitor=f'val_corr/{k}',
+                    aux_name=k,
+                    reduce_ratio=args.reduce_aux_loss_ratio,
+                    mode='max',
+                    patience=3,
+                    verbose=True,
+                )
+                callbacks.append(callback)
+
     if args.save_checkpoints:
         callbacks.append(checkpoint_callback)
 
