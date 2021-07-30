@@ -20,7 +20,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts BDCN V1',
+    project_name='debug',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -90,10 +90,6 @@ class LitModel(LightningModule):
             print('voxel_mask in ', self.device)
             self.voxel_masks = torch.stack(voxel_masks, 0)
 
-        if self.hparams.voxel_wise:
-            # record each validation step for every voxel
-            self.recored_voxel_corrs = None
-            self.recored_predictions = None
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -113,7 +109,7 @@ class LitModel(LightningModule):
         parser.add_argument('--x2_pooling_mode', type=str, default='spp')
         parser.add_argument('--x3_pooling_mode', type=str, default='spp')
         parser.add_argument('--x4_pooling_mode', type=str, default='spp')
-        parser.add_argument('--fc_fusion', type=str, default='concat')
+        parser.add_argument('--final_fusion', type=str, default='concat')
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--bdcn_outputs', type=str, default='-1')
         parser.add_argument('--bdcn_pool_size', type=int, default=1)
@@ -125,7 +121,6 @@ class LitModel(LightningModule):
         parser.add_argument('--freeze_bn', default=False, action="store_true")
         parser.add_argument('--convtrans_bn', default=False, action="store_true")
         parser.add_argument('--no_convtrans', default=False, action="store_true")
-        parser.add_argument('--voxel_wise', default=False, action="store_true")
         # legacy
         parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")
@@ -274,32 +269,6 @@ class LitModel(LightningModule):
                 aux_val_corr = vectorized_correlation(outs, val_ys).mean()
                 self.log(f'val_corr/{k}', aux_val_corr, prog_bar=True, logger=True, sync_dist=True)
 
-        if self.hparams.voxel_wise:
-            prediction_dir = os.path.join(args.predictions_dir, task.id)
-
-            val_corr = val_corr.cpu()
-            # self.recored_voxel_corrs = torch.vstack(
-            #     [self.recored_voxel_corrs, val_corr]) if self.recored_voxel_corrs is not None else val_corr
-            torch.save(val_corr, os.path.join(prediction_dir, f'voxel_vorrs-{self.global_step}.pt'))
-
-            with torch.no_grad():
-                device = self.backbone.conv1.weight.device  # TODO
-                prediction = []
-                for batch in self.trainer.datamodule.predict_dataloader():
-                    out = self(batch.to(device))
-                    prediction.append(out)
-
-            if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
-                prediction = torch.cat(prediction, 0)
-                prediction = prediction[self.voxel_masks.unsqueeze(0).expand(prediction.size()) == 1].reshape(
-                    prediction.shape[0], -1)
-            else:
-                prediction = torch.cat([p[0] for p in prediction], 0)  # aux in 1
-            prediction = prediction.cpu()
-            # self.recored_predictions = torch.vstack(
-            #     [self.recored_predictions, prediction]) if self.recored_predictions is not None else prediction
-            torch.save(prediction, os.path.join(prediction_dir, f'predictions-{self.global_step}.pt'))
-
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
         no_decay = ["bias", "BatchNorm3D.weight", "BatchNorm1D.weight", "BatchNorm2D.weight"]
@@ -414,18 +383,14 @@ def train(args):
 
     dm.teardown()
 
-    if not args.voxel_wise:
-        if args.save_checkpoints:
-            dm.setup('test')
-            plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
-                                                    hparams=hparams)
-            prediction = trainer.predict(plmodel, datamodule=dm)
-            prediction = torch.cat([p[0] for p in prediction], 0)
-            for roi, pred in zip(args.rois.split(','), torch.hsplit(prediction, dm.roi_lens)[:-1]):
-                torch.save(pred, os.path.join(prediction_dir, f'{roi}.pt'))
-    # else:
-    #     torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.pt'))
-    #     torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.pt'))
+    if args.save_checkpoints:
+        dm.setup('test')
+        plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
+                                                hparams=hparams)
+        prediction = trainer.predict(plmodel, datamodule=dm)
+        prediction = torch.cat([p[0] for p in prediction], 0)
+        for roi, pred in zip(args.rois.split(','), torch.hsplit(prediction, dm.roi_lens)[:-1]):
+            torch.save(pred, os.path.join(prediction_dir, f'{roi}.pt'))
 
 
 if __name__ == '__main__':

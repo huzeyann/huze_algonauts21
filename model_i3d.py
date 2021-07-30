@@ -352,11 +352,43 @@ class ConvResponseModel(nn.Module):
         return x
 
 
+class ConvFusion(nn.Module):
+    def __init__(self, num_voxels, num_chs, fusion_type='concat', ):
+        super(ConvFusion, self).__init__()
+        assert fusion_type in ['concat', 'conv', 'conv_voxel']
+        self.fusion_type = fusion_type
+
+        if fusion_type == 'conv_voxel':
+            self.weight = torch.nn.Parameter(data=torch.rand(num_voxels, num_chs), requires_grad=True)
+        elif fusion_type == 'conv':
+            self.weight = torch.nn.Parameter(data=torch.rand(num_chs), requires_grad=True)
+
+    def init_weights(self):
+        pass
+
+    def forward(self, input):
+        assert (isinstance(input, tuple)) or (isinstance(input, dict))
+        if isinstance(input, dict):
+            input = tuple(input.values())
+
+        if self.fusion_type == 'concat':
+            out = torch.cat(input, -1)
+
+        elif self.fusion_type == 'conv' or self.fusion_type == 'conv_voxel':
+            out = torch.stack(input, -1)
+            out = (out * self.weight).mean(-1)
+
+        else:
+            raise ValueError
+
+        return out
+
+
 class I3d_rgb(nn.Module):
 
     def __init__(self, hparams):
         super(I3d_rgb, self).__init__()
-        assert hparams['fc_fusion'] in ['concat', 'add', 'avg']
+        assert hparams['final_fusion'] in ['concat', 'add', 'avg']
         self.hparams = hparams
         self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
         self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
@@ -378,9 +410,9 @@ class I3d_rgb(nn.Module):
             'x4': hparams['x4_pooling_mode'],
         }
         self.spp_level_dict = {
-            'x1': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
-            'x2': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
-            'x3': np.array([[1, 2, 2], [1, 3, 5], [1, 3, 5]]),
+            'x1': np.array([[1, 2, 2], [1, 5, 9], [1, 5, 9]]),
+            'x2': np.array([[1, 2, 2], [1, 5, 9], [1, 5, 9]]),
+            'x3': np.array([[1, 2, 2], [1, 5, 9], [1, 5, 9]]),
             'x4': np.array([[1, 1], [1, 3], [1, 3]]),
         }
         if self.is_pyramid:
@@ -390,14 +422,14 @@ class I3d_rgb(nn.Module):
         self.smooths = nn.ModuleDict()
         self.poolings = nn.ModuleDict()
         self.fc_input_dims = {}
-        self.first_fcs = nn.ModuleDict()
-        self.aux_fcs = nn.ModuleDict()
+        self.ch_response = nn.ModuleDict()
 
         self.is_x_label = False
         if 'x_label' in self.pyramid_layers:
             self.pyramid_layers.remove('x_label')
             self.is_x_label = True
 
+        self.num_chs = 0
         for x_i in self.pyramid_layers:
             for pathway in self.pathways:
                 k = f'{pathway}_{x_i}'
@@ -444,47 +476,21 @@ class I3d_rgb(nn.Module):
                 else:
                     NotImplementedError()
 
-                self.first_fcs.update({k: build_fc(
-                    hparams, self.fc_input_dims[k], hparams['output_size'], part='first')})
-                if self.aux_heads:
-                    self.aux_fcs.update({k: build_fc(
-                        hparams, self.fc_input_dims[k], hparams['output_size'], part='last')})
+                if not self.hparams['no_convtrans']:
+                    self.ch_response.update({k: build_fc(
+                        hparams, self.fc_input_dims[k], hparams['output_size'])})
+                else:
+                    self.ch_response.update({k: ConvResponseModel(self.fc_input_dims[k], hparams['num_subs'], hparams)})
 
-        if hparams['fc_fusion'] == 'concat':
-            final_in_dim = hparams['first_layer_hidden'] * \
-                           len(self.pathways) * \
-                           len(self.pyramid_layers)
-        elif hparams['fc_fusion'] == 'add' or hparams['fc_fusion'] == 'avg':
-            final_in_dim = hparams['first_layer_hidden']
-        else:
-            NotImplementedError()
+                self.num_chs += 1
 
-        if hparams['additional_features']:
-            assert hparams['fc_fusion'] == 'concat'
-            if 'vggish' in hparams['additional_features']:
-                final_in_dim += 3 * 128
-            if 'i3d_rgb' in hparams['additional_features']:
-                final_in_dim += 1024
-            if 'i3d_flow' in hparams['additional_features']:
-                final_in_dim += 1024
-
-        if self.is_x_label:
-            final_in_dim += 292
-
-        self.final_fusion = FcFusion(fusion_type=hparams['fc_fusion'])
-        # hparams['num_layers'] = hparams['num_layers'] - 1  # substract first_fc
-        if self.hparams['track'] == 'mini_track':
-            self.final_fc = build_fc(hparams, final_in_dim, hparams['output_size'])
-        elif self.hparams['track'] == 'full_track':
-            if not self.hparams['no_convtrans']:
-                self.response = ConvResponseModel(final_in_dim, hparams['num_subs'], hparams)
-            else:
-                self.response = build_fc(hparams, final_in_dim, hparams['output_size'])
+        self.final_fusion = ConvFusion(num_voxels=hparams['output_size'], num_chs=self.num_chs,
+                                       fusion_type=hparams['final_fusion'])
 
     def forward(self, x):
 
-        if self.is_x_label:
-            x_label = x['x_label']
+        # if self.is_x_label:
+        #     x_label = x['x_label']
 
         # drop x (clone for parallel path)
         x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
@@ -492,25 +498,18 @@ class I3d_rgb(nn.Module):
         if self.is_pyramid:
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
         x = {k: self.poolings[k](v) for k, v in x.items()}
-        x = {k: self.first_fcs[k](v) for k, v in x.items()}
+        x = {k: self.ch_response[k](v) for k, v in x.items()}
 
         # if len(x_add) > 0:
         #     assert self.hparams['additional_features'] != ''
         #     assert self.aux_heads == False
         #     x.update(x_add)
+        # if self.is_x_label:
+        #     x.update({'x_label': x_label})
 
-        if self.is_x_label:
-            x.update({'x_label': x_label})
-
-        if self.hparams['track'] == 'mini_track':
-            out_aux = {k: self.aux_fcs[k](v) for k, v in x.items()} if self.aux_heads else None
-            # print(self.final_fusion(x).shape, self.final_fc)
-            out = self.final_fc(self.final_fusion(x))
-            return out, out_aux
-
-        elif self.hparams['track'] == 'full_track':
-            out = self.response(self.final_fusion(x))
-            return out
+        out_aux = {k: self.ch_response[k](v) for k, v in x.items()} if self.aux_heads else None
+        out = self.final_fusion(out_aux)
+        return out, out_aux
 
     def pyramid_pathway(self, x, layers, pathways):
         for pathway in pathways:

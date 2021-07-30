@@ -32,8 +32,23 @@ video_sizes = [64]
 bdcn_pool_sizes = [14]
 # rois = ['V1', 'EBA', 'V4', 'LOC', 'STS', 'FFA', 'PPA', 'V2', 'V3']
 pooling_modes = ['max']
-layer_hiddens = [2048]
-rois = ['V1,V2,V3,V4', 'EBA,LOC', 'V1', 'V2', 'V3', 'EBA', 'LOC']
+layer_hiddens = [512, 2048]
+# rois = ['V1,V2,V3,V4', 'EBA,LOC', 'V1', 'V2', 'V3', 'EBA', 'LOC']
+# rois = ['PPA,V1,V2,V3', 'FFA,V1,V2,V3', 'PPA,FFA,V1,V2,V3']
+
+rois = ['V1,V2,V3', 'EBA,LOC', 'PPA,FFA', 'STS']
+
+total = 0
+roi_combs = []
+for i in range(1, len(rois)+1):
+    comb = list(itertools.combinations(rois, i))
+    print(i, len(comb))
+    total += len(comb)
+    for c in comb:
+        roi = ','.join(c)
+        roi_combs.append(roi)
+rois = roi_combs
+
 for num_frame in num_frames:
     for roi in rois:
         for pooling_mode in pooling_modes:
@@ -91,13 +106,14 @@ for num_frame in num_frames:
 
                         task_ids.append(cloned_task.id)
 
-rois = ['FFA,PPA,STS', 'FFA,PPA', 'FFA,STS', 'PPA,STS', 'STS', 'FFA', 'PPA']
+rois = ['FFA,PPA,V4', 'STS,V4', 'EBA,LOC,V4', 'V1,V2,V3,V4', 'V1,V4', 'V2,V4', 'V3,V4']
 num_frames = [4]
 video_sizes = [64]
 bdcn_pool_sizes = [14]
 # rois = ['V1', 'EBA', 'V4', 'LOC', 'STS', 'FFA', 'PPA', 'V2', 'V3']
 pooling_modes = ['max']
-layer_hiddens = [512]
+layer_hiddens = [2048]
+# rois = []
 for num_frame in num_frames:
     for roi in rois:
         for pooling_mode in pooling_modes:
