@@ -13,7 +13,7 @@ from clearml.automation.optuna import OptimizerOptuna
 
 aSearchStrategy = OptimizerOptuna
 
-PROJECT_NAME = 'debug'
+PROJECT_NAME = 'ROI LAYER search RF'
 BASE_TASK = 'task template'
 TASK_NAME = 'HPO'
 
@@ -47,7 +47,7 @@ execution_queue = queue_dict[(args.roi, args.layer)]
 DEVICE = execution_queue.split('-')[-1]
 
 task = Task.init(project_name=PROJECT_NAME,
-                 task_name=f"{TASK_NAME} {args.roi} {args.layer}",
+                 task_name=f"{TASK_NAME},{args.roi},{args.layer}",
                  # task_type=Task.TaskTypes.optimizer,
                  reuse_last_task_id=False)
 task.connect(args)

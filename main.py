@@ -20,8 +20,10 @@ from pyramidpooling import *
 
 from clearml import Task, Logger
 
+PROJECT_NAME = 'ROI LAYER search RF'
+
 task = Task.init(
-    project_name='debug',
+    project_name=PROJECT_NAME,
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
