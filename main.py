@@ -416,8 +416,7 @@ def train(args):
 
     if not args.voxel_wise:
         if args.save_checkpoints:
-            stage = 'test' if not args.predict_all else 'predict_all'
-            dm.setup(stage)
+            dm.setup('test')
             plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
                                                     hparams=hparams)
             prediction = trainer.predict(plmodel, datamodule=dm)
@@ -462,7 +461,6 @@ if __name__ == '__main__':
     parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
-    parser.add_argument('--predict_all', default=False, action="store_true")
 
     parser = LitModel.add_model_specific_args(parser)
     args = parser.parse_args()
