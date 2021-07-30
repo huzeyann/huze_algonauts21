@@ -353,8 +353,9 @@ class ConvResponseModel(nn.Module):
 
 
 class ConvFusion(nn.Module):
-    def __init__(self, num_voxels, num_chs, fusion_type='concat', ):
+    def __init__(self, num_voxels, num_chs, fusion_type='concat', detach=False):
         super(ConvFusion, self).__init__()
+        self.detach = detach
         assert fusion_type in ['concat', 'conv', 'conv_voxel']
         self.fusion_type = fusion_type
 
@@ -370,6 +371,9 @@ class ConvFusion(nn.Module):
         assert (isinstance(input, tuple)) or (isinstance(input, dict))
         if isinstance(input, dict):
             input = tuple(input.values())
+
+        if self.detach:
+            input = tuple(i.detach().clone() for i in input)
 
         if self.fusion_type == 'concat':
             out = torch.cat(input, -1)
@@ -484,7 +488,7 @@ class I3d_rgb(nn.Module):
                 self.num_chs += 1
 
         self.final_fusion = ConvFusion(num_voxels=hparams['output_size'], num_chs=self.num_chs,
-                                       fusion_type=hparams['final_fusion'])
+                                       fusion_type=hparams['final_fusion'], detach=hparams['detach_aux'])
 
     def forward(self, x):
 

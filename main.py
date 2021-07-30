@@ -129,6 +129,7 @@ class LitModel(LightningModule):
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.0)
         parser.add_argument('--reduce_aux_loss_ratio', type=float, default=-1)
+        parser.add_argument('--detach_aux', default=False, action="store_true")
         parser.add_argument('--sample_voxels', default=False, action="store_true")
         parser.add_argument('--sample_num_voxels', type=int, default=1000)
         parser.add_argument('--freeze_bn', default=False, action="store_true")
