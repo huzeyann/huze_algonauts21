@@ -167,16 +167,14 @@ b_optimizer = HyperParameterOptimizer(
     local_port=50902,
 )
 
-a_task = Task.init(project_name=PROJECT_NAME,
+a_task = Task.create(project_name=PROJECT_NAME,
                  task_name=f"A",
-                 task_type=Task.TaskTypes.optimizer,
-                 reuse_last_task_id=False)
+                 task_type=Task.TaskTypes.optimizer,)
 a_optimizer.set_optimizer_task(a_task)
 
-b_task = Task.init(project_name=PROJECT_NAME,
+b_task = Task.create(project_name=PROJECT_NAME,
                  task_name=f"A",
-                 task_type=Task.TaskTypes.optimizer,
-                 reuse_last_task_id=False)
+                 task_type=Task.TaskTypes.optimizer,)
 b_optimizer.set_optimizer_task(b_task)
 
 a_optimizer.set_report_period(0.2)
