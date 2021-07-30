@@ -373,7 +373,7 @@ class ConvFusion(nn.Module):
             input = tuple(input.values())
 
         if self.detach:
-            input = tuple(i.detach().clone() for i in input)
+            input = tuple(i.clone().detach() for i in input)
 
         if self.fusion_type == 'concat':
             out = torch.cat(input, -1)
