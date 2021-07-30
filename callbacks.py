@@ -223,6 +223,7 @@ class ReduceAuxLossWeight(Callback):
                     f"Monitored metric {self.monitor} did not improve in the last {self.wait_count} records."
                     f" Best score: {self.best_score:.3f}. Signaling Trainer to stop."
                 )
+                self.wait_count = 0
 
         return should_stop, reason
 
