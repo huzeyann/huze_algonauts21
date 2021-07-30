@@ -20,7 +20,7 @@ from pyramidpooling import *
 from clearml import Task
 
 task = Task.init(
-    project_name='Algonauts BDCN debug',
+    project_name='Algonauts BDCN V1',
     task_name='task template',
     tags=None,
     reuse_last_task_id=False,
@@ -149,8 +149,9 @@ class LitModel(LightningModule):
         if self.hparams.backbone_type == 'bdcn_edge':
             # img to vid
             out_vid = [x.reshape(s[0], s[1], s[3], s[4]) for x in out_vid]
-            # if self.training == False:
-            #     self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]), global_step=self.global_step, dataformats='HW')
+            if self.training == False:
+                self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]),
+                                                 global_step=self.global_step, dataformats='HW')
                 # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
 
         # out = self.neck(out_vid, x_add)
@@ -194,7 +195,7 @@ class LitModel(LightningModule):
                 loss = F.mse_loss(out_voxels, y)
             if is_log:
                 self.log(f'{prefix}_mse_loss/final', loss,
-                         on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                         on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=False)
             return out_voxels, loss, None
 
     def training_step(self, batch, batch_idx):
@@ -241,7 +242,25 @@ class LitModel(LightningModule):
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
         val_corr = vectorized_correlation(val_outs, val_ys)
         # print(val_corr.mean())
-        self.log('val_corr/final', val_corr.mean(), prog_bar=True, logger=True, sync_dist=True)
+        self.log('val_corr/final', val_corr.mean(), prog_bar=True, logger=True, sync_dist=False)
+
+        def roi_correlation(x, y, roi_lens, roi_names):
+            xx = torch.hsplit(x, roi_lens)[:-1]
+            yy = torch.hsplit(y, roi_lens)[:-1]
+
+            corrs_dict = {}
+            i = 0
+            for roi in roi_names:
+                a, b = xx[i], yy[i]
+                corr = vectorized_correlation(a, b).mean().item()
+                corrs_dict[roi] = corr
+                i += 1
+
+            return corrs_dict
+
+        for roi, corr in roi_correlation(val_outs, val_ys, self.trainer.datamodule.roi_lens,
+                                         self.hparams.rois.split(',')).items():
+            self.log(f'val_corr/{roi}', corr, logger=True, sync_dist=False)
 
         # aux heads
         if val_step_outputs[0]['out_aux'] is not None:
@@ -327,7 +346,7 @@ def train(args):
                              additional_features_dir=args.additional_features_dir,
                              additional_features=args.additional_features,
                              preprocessing_type=args.preprocessing_type)
-    dm.setup()
+    dm.setup('fit')
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_corr/final',
@@ -393,12 +412,18 @@ def train(args):
 
     trainer.fit(plmodel, datamodule=dm)
 
+    dm.teardown()
+
     if not args.voxel_wise:
         if args.save_checkpoints:
+            stage = 'test' if not args.predict_all else 'predict_all'
+            dm.setup(stage)
             plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
                                                     hparams=hparams)
             prediction = trainer.predict(plmodel, datamodule=dm)
-            torch.save(prediction, os.path.join(prediction_dir, f'{args.rois}.pt'))
+            prediction = torch.cat([p[0] for p in prediction], 0)
+            for roi, pred in zip(args.rois.split(','), torch.hsplit(prediction, dm.roi_lens)[:-1]):
+                torch.save(pred, os.path.join(prediction_dir, f'{roi}.pt'))
     # else:
     #     torch.save(plmodel.recored_predictions, os.path.join(prediction_dir, f'predictions.pt'))
     #     torch.save(plmodel.recored_voxel_corrs, os.path.join(prediction_dir, f'voxel_corrs.pt'))
@@ -437,6 +462,7 @@ if __name__ == '__main__':
     parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
+    parser.add_argument('--predict_all', default=False, action="store_true")
 
     parser = LitModel.add_model_specific_args(parser)
     args = parser.parse_args()

@@ -118,7 +118,8 @@ class AlgonautsDataset(Dataset):
         self.train = train
         self.dataset_dir = dataset_dir
         self.subs = [f'sub{i + 1:02d}' for i in range(10)] if subs == 'all' else subs.split(',')
-        csv_path = os.path.join(self.dataset_dir, 'train_val.csv' if train else 'predict.csv')
+        csv = 'train_val.csv' if train else 'full_vid.csv'
+        csv_path = os.path.join(self.dataset_dir, csv)
         self.file_df = pd.read_csv(csv_path)
         self.track = track
         if self.track == 'full_track':
@@ -127,7 +128,7 @@ class AlgonautsDataset(Dataset):
         # load video
         if self.cached:  # this can get big
             cache_dir = '/home/huze/.cache/'
-            cache_file = cache_dir + f'videos_{self.num_frames}_{self.resolution}_{self.preprocessing_type}_{self.train}.pt'
+            cache_file = cache_dir + f'videos_{self.num_frames}_{self.resolution}_{self.preprocessing_type}_{self.train}_{len(self.file_df)}.pt'
             if os.path.exists(cache_file):
                 self.videos = torch.load(cache_file)
             else:
@@ -220,9 +221,15 @@ class AlgonautsDataModule(pl.LightningDataModule):
         self.rois = rois
         self.datasets_dir = datasets_dir
         self.train_full_len = 1000
-        self.file_list = ['train_val.csv', 'predict.csv']
+        self.file_list = ['train_val.csv', 'full_vid.csv']
         self.file_list = [os.path.join(self.datasets_dir, f) for f in self.file_list]
         self.batch_size = batch_size
+
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
+
+        self._has_setup_predict_all = True
 
     def prepare_data(self) -> None:
         for f in self.file_list:
@@ -246,6 +253,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 subs=self.subs,
                 preprocessing_type=self.preprocessing_type,
             )
+            self.roi_lens = algonauts_full.idx_ends.tolist()
 
             if not self.use_cv:
                 num_train = int(self.train_full_len * (1 - self.val_ratio))
@@ -283,7 +291,6 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 subs=self.subs,
                 preprocessing_type=self.preprocessing_type,
             )
-            self.num_voxels = getattr(self, 'num_voxels')
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size,
@@ -299,7 +306,15 @@ class AlgonautsDataModule(pl.LightningDataModule):
 
     def teardown(self, stage: Optional[str] = None):
         # Used to clean-up when the run is finished
-        ...
+        if stage in (None, 'fit'):
+            delattr(self, 'train_dataset')
+            delattr(self, 'val_dataset')
+            setattr(self, 'train_dataset', None)
+            setattr(self, 'val_dataset', None)
+
+        if stage in (None, 'test'):
+            delattr(self, 'test_dataset')
+            setattr(self, 'test_dataset', None)
 
 
 if __name__ == '__main__':
