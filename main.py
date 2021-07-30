@@ -18,7 +18,7 @@ from sam import SAM
 from utils import *
 from pyramidpooling import *
 
-from clearml import Task
+from clearml import Task, Logger
 
 task = Task.init(
     project_name='debug',
@@ -252,9 +252,11 @@ class LitModel(LightningModule):
     def validation_epoch_end(self, val_step_outputs) -> None:
         val_outs = torch.cat([out['out'] for out in val_step_outputs], 0)
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
-        val_corr = vectorized_correlation(val_outs, val_ys)
+        val_corr = vectorized_correlation(val_outs, val_ys).mean()
         # print(val_corr.mean())
-        self.log('val_corr/final', val_corr.mean(), prog_bar=True, logger=True, sync_dist=False)
+        self.log('val_corr/final', val_corr, prog_bar=True, logger=True, sync_dist=False)
+        Logger.current_logger().report_scalar(
+            "validation", "correlation", iteration=self.global_step, value=val_corr)
 
         def roi_correlation(x, y, roi_lens, roi_names):
             xx = torch.hsplit(x, roi_lens)[:-1]
