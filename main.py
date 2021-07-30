@@ -129,6 +129,8 @@ class LitModel(LightningModule):
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.0)
         parser.add_argument('--reduce_aux_loss_ratio', type=float, default=-1)
+        parser.add_argument('--reduce_aux_min_delta', type=float, default=0.01)
+        parser.add_argument('--reduce_aux_patience', type=int, default=2)
         parser.add_argument('--detach_aux', default=False, action="store_true")
         parser.add_argument('--sample_voxels', default=False, action="store_true")
         parser.add_argument('--sample_num_voxels', type=int, default=1000)
@@ -368,8 +370,8 @@ def train(args):
                     reduce_ratio=args.reduce_aux_loss_ratio,
                     reduce_max_counts=int(math.log(0.001, args.reduce_aux_loss_ratio) + 1),
                     mode='max',
-                    min_delta=0.01,
-                    patience=2,
+                    min_delta=args.reduce_aux_min_delta,
+                    patience=args.reduce_aux_patience,
                     verbose=False,
                 )
                 callbacks.append(callback)
