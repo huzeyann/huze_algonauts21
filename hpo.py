@@ -168,12 +168,12 @@ b_optimizer = HyperParameterOptimizer(
 )
 
 a_task = Task.create(project_name=PROJECT_NAME,
-                 task_name=f"A",
+                 task_name=f"optimizer A",
                  task_type=Task.TaskTypes.optimizer,)
 a_optimizer.set_optimizer_task(a_task)
 
 b_task = Task.create(project_name=PROJECT_NAME,
-                 task_name=f"A",
+                 task_name=f"optimizer B",
                  task_type=Task.TaskTypes.optimizer,)
 b_optimizer.set_optimizer_task(b_task)
 
