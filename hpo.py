@@ -141,7 +141,7 @@ a_optimizer = HyperParameterOptimizer(
     local_port=args.local_port,
 )
 
-a_optimizer.set_report_period(0.2)
+a_optimizer.set_report_period(1)
 a_optimizer.start(job_complete_callback=job_complete_callback)
 a_optimizer.set_time_limit(in_minutes=48 * 60)
 a_optimizer.wait()
