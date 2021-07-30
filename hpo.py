@@ -59,6 +59,7 @@ if not os.path.exists(dir_path):
     os.mkdir(dir_path)
 CSV_PATH = f'{dir_path}/{args.roi}_{args.layer}.csv'
 
+
 def job_complete_callback(
         job_id,  # type: str
         objective_value,  # type: float
@@ -78,7 +79,6 @@ def job_complete_callback(
     RES_DF.to_csv(CSV_PATH)
     if job_id == top_performance_job_id:
         print('WOOT WOOT we broke the record! Objective reached {}'.format(objective_value))
-
 
 
 pool_size_max = 14 if args.layer != 'x4' else 9
@@ -143,7 +143,6 @@ a_optimizer = HyperParameterOptimizer(
 
 a_optimizer.set_report_period(0.2)
 a_optimizer.start(job_complete_callback=job_complete_callback)
-a_optimizer.set_time_limit(in_minutes=120.0)
+a_optimizer.set_time_limit(in_minutes=48 * 60)
 a_optimizer.wait()
 a_optimizer.stop()
-
