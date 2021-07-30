@@ -180,7 +180,7 @@ class ReduceAuxLossWeight(Callback):
         if should_stop:
             pl_module.aux_loss_weights[self.aux_name] = pl_module.aux_loss_weights[self.aux_name] * self.reduce_ratio
             # print(self.aux_name, "should stop")
-        else:
+        # else:
             # print(self.aux_name, "should not stop")
         if should_stop:
             self.reduced_epoch = trainer.current_epoch
