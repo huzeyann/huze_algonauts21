@@ -17,6 +17,7 @@ from model_i3d import *
 from sam import SAM
 from utils import *
 from pyramidpooling import *
+import pandas as pd
 
 from clearml import Task, Logger
 
@@ -424,6 +425,22 @@ def train(args):
 
     dm.teardown()
 
+    if args.save_csv:
+        file = 'dirtycsv.csv'
+        res = {
+            'roi': args.rois,
+            'layer': args.pyramid_layers,
+            'pool_rf': hparams[f'pooling_size_{args.pyramid_layers}'],
+            'objective_value': early_stop_callback.best_score.item(),
+            'objective_iteration': plmodel.global_step,
+        }
+        if not os.path.exists(file):
+            df = pd.DataFrame()
+        else:
+            df = pd.read_csv(file)
+        df = df.append(res, ignore_index=True)
+        df.to_csv(file)
+
     if args.save_checkpoints:
         dm.setup('test')
         plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
@@ -467,6 +484,7 @@ if __name__ == '__main__':
     parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
     parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
+    parser.add_argument('--save_csv', default=False, action="store_true")
 
     parser = LitModel.add_model_specific_args(parser)
     args = parser.parse_args()
