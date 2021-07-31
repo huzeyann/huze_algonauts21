@@ -426,7 +426,7 @@ def train(args):
     dm.teardown()
 
     if args.save_csv:
-        file = 'dirtycsv.csv'
+        file = '/data_smr/huze/projects/my_algonauts/dirtycsv.csv'
         res = {
             'roi': args.rois,
             'layer': args.pyramid_layers,

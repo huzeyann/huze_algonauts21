@@ -1,4 +1,5 @@
 import itertools
+from time import sleep
 
 from clearml import Task
 
@@ -140,8 +141,9 @@ step3_search_space = {('V1', 'x1'): [2, 4, 8, 10, 14],
                       ('STS', 'x3'): [2, 4, 8, 10, 14],
                       ('STS', 'x4'): [8]}
 
-for step in [step1_search_space, step2_search_space, step3_search_space][:1]:
-    for (roi, layer), rfs in step.items()[:1]:
+first_call = True
+for step in [step1_search_space, step2_search_space, step3_search_space]:
+    for (roi, layer), rfs in step.items():
         for rf in rfs:
             queue = next(queues_buffer)
 
@@ -149,7 +151,7 @@ for step in [step1_search_space, step2_search_space, step3_search_space][:1]:
                                      name=template_task.name + f' {roi},{layer},{rf}',
                                      parent=template_task.id)
 
-            cloned_task.add_tags([roi, layer, rf])
+            cloned_task.add_tags([roi, layer, str(rf)])
 
             cloned_task_parameters = cloned_task.get_parameters()
             # cloned_task_parameters['rois'] = [roi]
@@ -189,5 +191,9 @@ for step in [step1_search_space, step2_search_space, step3_search_space][:1]:
             print('Experiment id={} enqueue for execution'.format(cloned_task.id))
 
             task_ids.append(cloned_task.id)
+
+            if first_call:
+                sleep(10)
+                first_call = False
 
 print(task_ids)
