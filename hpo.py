@@ -73,6 +73,7 @@ def job_complete_callback(
         'layer': args.layer,
         'pool_rf': job_parameters[f'Args/pooling_size_{args.layer}'],
         'objective_value': objective_value,
+        'objective_iteration': objective_iteration,
     }
     global RES_DF
     RES_DF = RES_DF.append(res, ignore_index=True)
