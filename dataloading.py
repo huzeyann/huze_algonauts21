@@ -91,6 +91,28 @@ def wrap_load_videos(root, file_lists, num_frames=16, resolution=288, preprocess
     return vids
 
 
+def wrap_load_one_video(root, file, num_frames=16, resolution=288, preprocessing_type='mmit'):
+    if preprocessing_type == 'mmit':
+        resize_normalize = transforms.Compose([
+            transforms.Resize((resolution, resolution)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+    elif preprocessing_type == 'bdcn':
+        resize_normalize = transforms.Compose([
+            transforms.Resize((resolution, resolution)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.4810938, 0.45752459, 0.40787055], [1, 1, 1]),
+            RGB2BGR(),
+            TwoFiveFive(),
+        ])
+    else:
+        NotImplementedError()
+
+    vid = load_video(os.path.join(root, file), num_frames, resize_normalize)
+    return vid
+
+
 def wrap_load_fmris(root, file_list):
     fmris = []
     for file in file_list:
@@ -107,7 +129,8 @@ class AlgonautsDataset(Dataset):
                  additional_features_dir='',
                  rois='EBA', num_frames=16, resolution=288,
                  train=True, cached=True, track='mini_track', subs='all',
-                 preprocessing_type='mmit'):
+                 preprocessing_type='mmit', load_from_np=False):
+        self.load_from_np = load_from_np
         self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
         self.additional_features = additional_features
@@ -121,27 +144,11 @@ class AlgonautsDataset(Dataset):
         csv = 'train_val.csv' if train else 'full_vid.csv'
         csv_path = os.path.join(self.dataset_dir, csv)
         self.file_df = pd.read_csv(csv_path)
+        self.vid_file_list = self.file_df['vid'].values
+        self.vid_root = os.path.join(self.dataset_dir, 'videos')
         self.track = track
         if self.track == 'full_track':
             assert self.rois == 'WB'
-
-        # load video
-        if self.cached:  # this can get big
-            cache_dir = '/home/huze/.cache/'
-            cache_file = cache_dir + f'videos_{self.num_frames}_{self.resolution}_{self.preprocessing_type}_{self.train}_{len(self.file_df)}.pt'
-            if os.path.exists(cache_file):
-                self.videos = torch.load(cache_file)
-            else:
-                self.videos = wrap_load_videos(os.path.join(self.dataset_dir, 'videos'),
-                                               self.file_df['vid'].values,
-                                               self.num_frames, self.resolution,
-                                               preprocessing_type=self.preprocessing_type)
-                torch.save(self.videos, cache_file)
-        else:
-            self.videos = wrap_load_videos(os.path.join(self.dataset_dir, 'videos'),
-                                           self.file_df['vid'].values,
-                                           self.num_frames, self.resolution,
-                                           preprocessing_type=self.preprocessing_type)
 
         # load freezed layers
         if self.additional_features:
@@ -152,6 +159,29 @@ class AlgonautsDataset(Dataset):
                     np.load(os.path.join(self.additional_features_dir, f'{af}.npy'))).float()
         else:
             self.additional_features = []
+
+        if not self.load_from_np:
+            if self.cached:
+                self.cached_dir = os.path.join(self.dataset_dir,
+                                               f'{self.resolution}_{self.num_frames}_{self.preprocessing_type}_npy')
+                # save to np
+                os.makedirs(self.cached_dir, exist_ok=True)
+                for file in tqdm(self.vid_file_list):
+                    name = os.path.basename(file).replace('.mp4', '.npy')
+                    path = os.path.join(self.cached_dir, name)
+                    if not os.path.exists(path):
+                        vid = wrap_load_one_video(self.vid_root, file,
+                                                  num_frames=self.num_frames,
+                                                  resolution=self.resolution,
+                                                  preprocessing_type=self.preprocessing_type)
+                        np.save(path, vid.numpy())
+            else:
+                NotImplementedError()
+        else:
+            self.cached_dir = os.path.join(self.dataset_dir, 'numpy')
+
+        self.np_paths = [os.path.join(self.cached_dir, os.path.basename(f).replace('.mp4', '.npy'))
+                         for f in self.vid_file_list]
 
         # load fmri
         if train:
@@ -166,16 +196,19 @@ class AlgonautsDataset(Dataset):
                                      self.file_df[roi].values)
                      for roi in self.rois.split(',')])
             elif self.track == 'full_track':
+                assert self.rois == 'WB'
                 self.fmris, self.idx_ends = concat_and_mask(
                     [wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'), self.file_df[sub].values)
                      for sub in self.subs])
 
     def __len__(self):
-        return len(self.videos)
+        return len(self.vid_file_list)
 
     def __getitem__(self, index):
 
-        x = {'video': self.videos[index]}
+        vid = np.load(self.np_paths[index])
+
+        x = {'video': vid}
         additional_features = {af: self.features[af][index] for af in self.additional_features}
         x.update(additional_features)
 
@@ -203,8 +236,10 @@ class AlgonautsDataModule(pl.LightningDataModule):
                  use_cv=False,
                  num_split=None,
                  fold=-1,
-                 preprocessing_type='mmit'):
+                 preprocessing_type='mmit',
+                 load_from_np=False):
         super().__init__()
+        self.load_from_np = load_from_np
         self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
         self.additional_features = additional_features
@@ -240,7 +275,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
 
         # Assign Train/val split(s) for use in Dataloaders
         if stage in (None, 'fit'):
-            algonauts_full = AlgonautsDataset(
+            self.algonauts_full = AlgonautsDataset(
                 self.datasets_dir,
                 additional_features=self.additional_features,
                 additional_features_dir=self.additional_features_dir,
@@ -252,27 +287,28 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 track=self.track,
                 subs=self.subs,
                 preprocessing_type=self.preprocessing_type,
+                load_from_np=self.load_from_np,
             )
-            self.idx_ends = algonauts_full.idx_ends.tolist()
+            self.idx_ends = self.algonauts_full.idx_ends.tolist()
 
             if not self.use_cv:
                 num_train = int(self.train_full_len * (1 - self.val_ratio))
                 num_val = int(self.train_full_len * self.val_ratio)
                 if self.random_split:
-                    self.train_dataset, self.val_dataset = random_split(algonauts_full, [num_train, num_val],
+                    self.train_dataset, self.val_dataset = random_split(self.algonauts_full, [num_train, num_val],
                                                                         generator=torch.Generator().manual_seed(42))
                 else:
                     lengths = [num_train, num_val]
                     indices = np.arange(sum(lengths)).tolist()
                     self.train_dataset, self.val_dataset = \
-                        [Subset(algonauts_full, indices[offset - length: offset]) for offset, length in
+                        [Subset(self.algonauts_full, indices[offset - length: offset]) for offset, length in
                          zip(_accumulate(lengths), lengths)]
             else:
                 assert self.num_split > 0
                 kf = KFold(n_splits=self.num_split)
                 train, val = list(kf.split(np.arange(self.train_full_len)))[self.fold]
-                self.train_dataset = Subset(algonauts_full, train)
-                self.val_dataset = Subset(algonauts_full, val)
+                self.train_dataset = Subset(self.algonauts_full, train)
+                self.val_dataset = Subset(self.algonauts_full, val)
 
             self.num_voxels = self.train_dataset[0][1].shape[0]
 
@@ -290,33 +326,38 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 track=self.track,
                 subs=self.subs,
                 preprocessing_type=self.preprocessing_type,
+                load_from_np=self.load_from_np,
             )
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size,
-                          shuffle=True, num_workers=8, pin_memory=False)
+                          shuffle=True, num_workers=8, pin_memory=False, prefetch_factor=2)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size,
-                          shuffle=False, num_workers=8, pin_memory=False)
+                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=2)
 
     def predict_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size,
-                          shuffle=False, num_workers=8, pin_memory=False)
+                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=2)
 
     def teardown(self, stage: Optional[str] = None):
         # Used to clean-up when the run is finished
         if stage in (None, 'fit'):
             delattr(self, 'train_dataset')
             delattr(self, 'val_dataset')
-            # setattr(self, 'train_dataset', None)
-            # setattr(self, 'val_dataset', None)
-            self.train_dataset = None
-            self.val_dataset = None
+            delattr(self, 'algonauts_full')
+            setattr(self, 'train_dataset', None)
+            setattr(self, 'val_dataset', None)
+            setattr(self, 'algonauts_full', None)
+            # self.train_dataset = None
+            # self.val_dataset = None
+            # self.algonauts_full = None
         if stage in (None, 'test'):
             delattr(self, 'test_dataset')
-            # setattr(self, 'test_dataset', None)
-            self.test_dataset = None
+            setattr(self, 'test_dataset', None)
+            # self.test_dataset = None
+
 
 if __name__ == '__main__':
     d = AlgonautsDataset('datasets/')

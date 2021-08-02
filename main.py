@@ -364,7 +364,8 @@ def train(args):
                              use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold,
                              additional_features_dir=args.additional_features_dir,
                              additional_features=args.additional_features,
-                             preprocessing_type=args.preprocessing_type)
+                             preprocessing_type=args.preprocessing_type,
+                             load_from_np=args.load_from_np)
     dm.setup('fit')
 
     checkpoint_callback = ModelCheckpoint(
@@ -390,8 +391,8 @@ def train(args):
 
     callbacks = [early_stop_callback, finetune_callback]
 
+    rois = args.rois.split(',') if args.separate_rois else [args.rois]
     if args.reduce_aux_loss_ratio >= 0:
-        rois = args.rois.split(',') if args.separate_rois else [args.rois]
         for roi in rois:
             for x_i in args.pyramid_layers.split(','):
                 for pathway in args.pathways.split(','):
@@ -481,10 +482,10 @@ def train(args):
         dm.setup('test')
         plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
                                                 hparams=hparams)
-        prediction = trainer.predict(plmodel, datamodule=dm)
-        prediction = torch.cat([p[0] for p in prediction], 0)
-        for roi, pred in zip(args.rois.split(','), torch.hsplit(prediction, dm.idx_ends)[:-1]):
-            torch.save(pred, os.path.join(prediction_dir, f'{roi}.pt'))
+        predictions = trainer.predict(plmodel, datamodule=dm)
+        for roi in rois:
+            prediction = torch.cat([p[0][roi] for p in predictions], 0)
+            torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
 
 
 if __name__ == '__main__':
@@ -509,6 +510,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_check_interval', type=float, default=1.0)
     parser.add_argument('--val_ratio', type=float, default=0.1)
     parser.add_argument('--val_random_split', default=False, action="store_true")
+    parser.add_argument('--load_from_np', default=False, action="store_true")
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
     parser.add_argument('--use_cv', default=False, action="store_true")
     parser.add_argument('--fold', type=int, default=-1)

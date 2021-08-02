@@ -86,7 +86,7 @@ for roi in rois:
         cloned_task_parameters['Args/aux_loss_weight'] = 1
         cloned_task_parameters['Args/val_check_interval'] = 0.5
         cloned_task_parameters['Args/val_ratio'] = 0.1
-        cloned_task_parameters['Args/save_checkpoints'] = True
+        cloned_task_parameters['Args/save_checkpoints'] = False
         cloned_task_parameters['Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
 
         cloned_task.set_parameters(cloned_task_parameters)
