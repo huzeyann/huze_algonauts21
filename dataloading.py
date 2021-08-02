@@ -309,13 +309,14 @@ class AlgonautsDataModule(pl.LightningDataModule):
         if stage in (None, 'fit'):
             delattr(self, 'train_dataset')
             delattr(self, 'val_dataset')
-            setattr(self, 'train_dataset', None)
-            setattr(self, 'val_dataset', None)
-
+            # setattr(self, 'train_dataset', None)
+            # setattr(self, 'val_dataset', None)
+            self.train_dataset = None
+            self.val_dataset = None
         if stage in (None, 'test'):
             delattr(self, 'test_dataset')
-            setattr(self, 'test_dataset', None)
-
+            # setattr(self, 'test_dataset', None)
+            self.test_dataset = None
 
 if __name__ == '__main__':
     d = AlgonautsDataset('datasets/')
