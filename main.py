@@ -421,7 +421,7 @@ def train(args):
 
     tb_logger = pl_loggers.TensorBoardLogger(f'/data_smr/huze/projects/my_algonauts/lightning_logs/{task.id}/')
     csv_logger = pl_loggers.CSVLogger(f'/data_smr/huze/projects/my_algonauts/csv_logs/{task.id}/')
-    loggers = [csv_logger, tb_logger]
+    loggers = [tb_logger, csv_logger]
 
     trainer = pl.Trainer(
         precision=16 if args.fp16 else 32,
