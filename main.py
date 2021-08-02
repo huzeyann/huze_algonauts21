@@ -22,7 +22,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts mix all layers search RF'
+PROJECT_NAME = 'Algonauts mix all layers'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -391,20 +391,22 @@ def train(args):
     callbacks = [early_stop_callback, finetune_callback]
 
     if args.reduce_aux_loss_ratio >= 0:
-        for x_i in args.pyramid_layers.split(','):
-            for pathway in args.pathways.split(','):
-                k = f'{pathway}_{x_i}'
-                callback = ReduceAuxLossWeight(
-                    monitor=f'val_corr/{k}',
-                    aux_name=k,
-                    reduce_ratio=args.reduce_aux_loss_ratio,
-                    reduce_max_counts=int(math.log(0.001, args.reduce_aux_loss_ratio) + 1),
-                    mode='max',
-                    min_delta=args.reduce_aux_min_delta,
-                    patience=args.reduce_aux_patience,
-                    verbose=False,
-                )
-                callbacks.append(callback)
+        rois = args.rois.split(',') if args.separate_rois else [args.rois]
+        for roi in rois:
+            for x_i in args.pyramid_layers.split(','):
+                for pathway in args.pathways.split(','):
+                    k = f'{roi}_{pathway}_{x_i}'
+                    callback = ReduceAuxLossWeight(
+                        monitor=f'val_corr/{k}',
+                        aux_name=k,
+                        reduce_ratio=args.reduce_aux_loss_ratio,
+                        reduce_max_counts=int(math.log(0.001, args.reduce_aux_loss_ratio) + 1),
+                        mode='max',
+                        min_delta=args.reduce_aux_min_delta,
+                        patience=args.reduce_aux_patience,
+                        verbose=False,
+                    )
+                    callbacks.append(callback)
 
     if args.save_checkpoints:
         callbacks.append(checkpoint_callback)
