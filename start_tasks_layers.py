@@ -27,14 +27,17 @@ task_ids = []
 
 rois = ['V1', 'V2', 'V3', 'V4', 'EBA', 'LOC', 'PPA', 'FFA', 'STS']
 configs = [[3, 3, 3, 3],
-           [6, 6, 6, 3],
+           [6, 6, 6, 4],
+           [9, 9, 9, 2],
            [3, 6, 9, 3],
-           [2, 2, 5, 2],
+           [2, 3, 5, 2],
            [6, 9, 12, 4],
+           [3, 5, 7, 1],
            ]
 
 for roi in rois:
-    for rf1, rf2, rf3, rf4 in configs:
+    for rfs in configs:
+        rf1, rf2, rf3, rf4 = rfs
         queue = next(queues_buffer)
 
         tags = [roi, ','.join([rf1, rf2, rf3, rf4])]
