@@ -30,31 +30,31 @@ rois = ['V1', 'V2', 'V3', 'V4', 'EBA', 'LOC', 'PPA', 'FFA', 'STS']
 layers = ['x1', 'x2', 'x3', 'x4']
 combs = list(itertools.product(rois, layers))
 
-step1_search_space = {('V1', 'x1'): [6, 9, 12],
-                      ('V1', 'x2'): [3, 9, 12],
-                      ('V1', 'x3'): [3, 9],
-                      ('V1', 'x4'): [3, 6, 9],
-                      ('V2', 'x1'): [3, 6, 9, 12],
-                      ('V2', 'x2'): [3, 9, 12],
-                      ('V2', 'x3'): [3, 6, 9],
+step1_search_space = {('V1', 'x1'): [],
+                      ('V1', 'x2'): [],
+                      ('V1', 'x3'): [],
+                      ('V1', 'x4'): [],
+                      ('V2', 'x1'): [],
+                      ('V2', 'x2'): [],
+                      ('V2', 'x3'): [],
                       ('V2', 'x4'): [],
-                      ('V3', 'x1'): [3, 9, 12],
-                      ('V3', 'x2'): [3, 6, 9],
-                      ('V3', 'x3'): [3, 6, 9],
-                      ('V3', 'x4'): [6, 9],
-                      ('V4', 'x1'): [6, 9, 12],
-                      ('V4', 'x2'): [3, 6, 12],
-                      ('V4', 'x3'): [3, 9, 12],
-                      ('V4', 'x4'): [6],
-                      ('EBA', 'x1'): [3, 6],
-                      ('EBA', 'x2'): [3, 9, 12],
-                      ('EBA', 'x3'): [3, 6, 9, 12],
-                      ('EBA', 'x4'): [3, 9],
-                      ('LOC', 'x1'): [3, 6, 9, 12],
-                      ('LOC', 'x2'): [9, 12],
-                      ('LOC', 'x3'): [3, 6, 9, 12],
-                      ('LOC', 'x4'): [3, 6, 9],
-                      ('PPA', 'x1'): [3, 6, 9, 12],
+                      ('V3', 'x1'): [],
+                      ('V3', 'x2'): [],
+                      ('V3', 'x3'): [],
+                      ('V3', 'x4'): [],
+                      ('V4', 'x1'): [],
+                      ('V4', 'x2'): [],
+                      ('V4', 'x3'): [],
+                      ('V4', 'x4'): [],
+                      ('EBA', 'x1'): [],
+                      ('EBA', 'x2'): [],
+                      ('EBA', 'x3'): [],
+                      ('EBA', 'x4'): [],
+                      ('LOC', 'x1'): [],
+                      ('LOC', 'x2'): [],
+                      ('LOC', 'x3'): [],
+                      ('LOC', 'x4'): [],
+                      ('PPA', 'x1'): [6, 12],
                       ('PPA', 'x2'): [3, 6, 12],
                       ('PPA', 'x3'): [3, 6, 12],
                       ('PPA', 'x4'): [3, 9],
@@ -140,15 +140,15 @@ step3_search_space = {('V1', 'x1'): [2, 4, 8, 10, 14],
                       ('STS', 'x2'): [2, 4, 10, 14],
                       ('STS', 'x3'): [2, 4, 8, 10, 14],
                       ('STS', 'x4'): [8]}
-
+steps = [step1_search_space, step2_search_space, step3_search_space]
 first_call = True
-for step in [step1_search_space, step2_search_space, step3_search_space]:
+for step in steps:
     for (roi, layer), rfs in step.items():
         for rf in rfs:
             queue = next(queues_buffer)
 
             cloned_task = Task.clone(source_task=template_task,
-                                     name=template_task.name + f' {roi},{layer},{rf}',
+                                     name=f'{roi},{layer},{rf}',
                                      parent=template_task.id)
 
             cloned_task.add_tags([roi, layer, str(rf)])
@@ -195,5 +195,8 @@ for step in [step1_search_space, step2_search_space, step3_search_space]:
             if first_call:
                 sleep(10)
                 first_call = False
+    #         break
+    #     break
+    # break
 
 print(task_ids)

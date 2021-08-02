@@ -368,7 +368,7 @@ class ConvFusion(nn.Module):
         pass
 
     def forward(self, input):
-        assert (isinstance(input, tuple)) or (isinstance(input, dict))
+        assert (isinstance(input, tuple)) or (isinstance(input, dict)) or (isinstance(input, list))
         if isinstance(input, dict):
             input = tuple(input.values())
 
@@ -406,6 +406,12 @@ class I3d_rgb(nn.Module):
         self.pathways = hparams['pathways'].split(',')  # ['topdown', 'bottomup'] aka 'parallel', or "none"
         self.is_pyramid = False if self.pathways[0] == 'none' else True
         self.aux_heads = True if hparams['aux_loss_weight'] > 0 else False
+        if hparams['separate_rois']:
+            self.rois = hparams['rois'].split(',')
+            self.output_sizes = hparams['roi_lens']
+        else:
+            self.rois = [hparams['rois']]
+            self.output_sizes = [hparams['output_size']]
         self.pooling_modes = {  # pooling_mode in ['no', 'spp', 'avg']
             'x1': hparams['x1_pooling_mode'],
             'x2': hparams['x2_pooling_mode'],
@@ -426,113 +432,141 @@ class I3d_rgb(nn.Module):
         self.poolings = nn.ModuleDict()
         self.fc_input_dims = {}
         self.ch_response = nn.ModuleDict()
+        self.final_fusions = nn.ModuleDict()
 
         self.is_x_label = False
         if 'x_label' in self.pyramid_layers:
             self.pyramid_layers.remove('x_label')
             self.is_x_label = True
 
-        self.num_chs = 0
-        for x_i in self.pyramid_layers:
-            for pathway in self.pathways:
-                k = f'{pathway}_{x_i}'
-                self.first_convs.update({k: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)})
+        self.num_chs = len(self.pyramid_layers) * len(self.pathways)
+        for roi, output_size in zip(self.rois, self.output_sizes):
+            for x_i in self.pyramid_layers:
+                for pathway in self.pathways:
+                    k = f'{roi}_{pathway}_{x_i}'
+                    self.first_convs.update(
+                        {k: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)})
 
-                if self.is_pyramid:
-                    self.smooths.update(
-                        {k: nn.Conv3d(self.planes, self.planes, kernel_size=3, stride=1, padding='same')})
+                    if self.is_pyramid:
+                        self.smooths.update(
+                            {k: nn.Conv3d(self.planes, self.planes, kernel_size=3, stride=1, padding='same')})
 
-                if self.pooling_modes[x_i] == 'no':
-                    self.poolings.update({k: nn.Flatten()})
-                    self.fc_input_dims.update({k: self.planes * np.product(self.twh_dict[x_i])})
-                elif self.pooling_modes[x_i] == 'avg':
-                    self.poolings.update({k: nn.Sequential(
-                        nn.AdaptiveAvgPool3d(1),
-                        nn.Flatten())})
-                    self.fc_input_dims.update({k: self.planes})
-                elif self.pooling_modes[x_i] == 'max':
-                    self.poolings.update({k: nn.Sequential(
-                        nn.AdaptiveMaxPool3d(1),
-                        nn.Flatten())})
-                    self.fc_input_dims.update({k: self.planes})
-                elif self.pooling_modes[x_i] == 'spp':
-                    self.poolings.update({k: nn.Sequential(
-                        SpatialPyramidPooling(self.spp_level_dict[x_i],
-                                              hparams['pooling_mode'],
-                                              hparams['softpool']),
-                        nn.Flatten())})
-                    self.fc_input_dims.update({k: np.sum(
-                        self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][
-                            2]) * self.planes})
-                elif self.pooling_modes[x_i] == 'adaptive_max':
-                    size = hparams[f'pooling_size_{x_i}']
-                    size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
-                    self.poolings.update({k: nn.Sequential(
-                        nn.AdaptiveMaxPool3d((size_t, size, size)),
-                        nn.Flatten())})
-                    self.fc_input_dims.update({k: self.planes * size_t * size * size})
-                elif self.pooling_modes[x_i] == 'adaptive_avg':
-                    size = hparams[f'pooling_size_{x_i}']
-                    size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
-                    self.poolings.update({k: nn.Sequential(
-                        nn.AdaptiveAvgPool3d((size_t, size, size)),
-                        nn.Flatten())})
-                    self.fc_input_dims.update({k: self.planes * size_t * size * size})
-                else:
-                    NotImplementedError()
+                    if self.pooling_modes[x_i] == 'no':
+                        self.poolings.update({k: nn.Flatten()})
+                        self.fc_input_dims.update({k: self.planes * np.product(self.twh_dict[x_i])})
+                    elif self.pooling_modes[x_i] == 'avg':
+                        self.poolings.update({k: nn.Sequential(
+                            nn.AdaptiveAvgPool3d(1),
+                            nn.Flatten())})
+                        self.fc_input_dims.update({k: self.planes})
+                    elif self.pooling_modes[x_i] == 'max':
+                        self.poolings.update({k: nn.Sequential(
+                            nn.AdaptiveMaxPool3d(1),
+                            nn.Flatten())})
+                        self.fc_input_dims.update({k: self.planes})
+                    elif self.pooling_modes[x_i] == 'spp':
+                        self.poolings.update({k: nn.Sequential(
+                            SpatialPyramidPooling(self.spp_level_dict[x_i],
+                                                  hparams['pooling_mode'],
+                                                  hparams['softpool']),
+                            nn.Flatten())})
+                        self.fc_input_dims.update({k: np.sum(
+                            self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][
+                                2]) * self.planes})
+                    elif self.pooling_modes[x_i] == 'adaptive_max':
+                        size = hparams[f'pooling_size_{x_i}']
+                        size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
+                        self.poolings.update({k: nn.Sequential(
+                            nn.AdaptiveMaxPool3d((size_t, size, size)),
+                            nn.Flatten())})
+                        self.fc_input_dims.update({k: self.planes * size_t * size * size})
+                    elif self.pooling_modes[x_i] == 'adaptive_avg':
+                        size = hparams[f'pooling_size_{x_i}']
+                        size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
+                        self.poolings.update({k: nn.Sequential(
+                            nn.AdaptiveAvgPool3d((size_t, size, size)),
+                            nn.Flatten())})
+                        self.fc_input_dims.update({k: self.planes * size_t * size * size})
+                    else:
+                        NotImplementedError()
 
-                if not self.hparams['no_convtrans']:
-                    self.ch_response.update({k: build_fc(
-                        hparams, self.fc_input_dims[k], hparams['output_size'])})
-                else:
-                    self.ch_response.update({k: ConvResponseModel(self.fc_input_dims[k], hparams['num_subs'], hparams)})
+                    if not self.hparams['no_convtrans']:
+                        self.ch_response.update({k: build_fc(
+                            hparams, self.fc_input_dims[k], output_size)})
+                    else:
+                        self.ch_response.update(
+                            {k: ConvResponseModel(self.fc_input_dims[k], hparams['num_subs'], hparams)})
 
-                self.num_chs += 1
-
-        self.final_fusion = ConvFusion(num_voxels=hparams['output_size'], num_chs=self.num_chs,
-                                       fusion_type=hparams['final_fusion'], detach=hparams['detach_aux'])
+        for roi, output_size in zip(self.rois, self.output_sizes):
+            self.final_fusions.update({f'{roi}': ConvFusion(
+                num_voxels=output_size, num_chs=self.num_chs,
+                fusion_type=hparams['final_fusion'], detach=hparams['detach_aux'])})
 
     def forward(self, x):
 
         # if self.is_x_label:
         #     x_label = x['x_label']
 
-        # drop x (clone for parallel path)
-        x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
+        # vid
+        out = {}
+        for roi in self.rois:
+            for x_i in self.pyramid_layers:
+                for pathway in self.pathways:
+                    k = f'{roi}_{pathway}_{x_i}'
+                    out[k] = x[x_i].clone()
+        x = out
+        # x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
         x = {k: self.first_convs[k](v) for k, v in x.items()}
         if self.is_pyramid:
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
         x = {k: self.poolings[k](v) for k, v in x.items()}
-        out_aux = {k: self.ch_response[k](v) for k, v in x.items()}
 
-        # if len(x_add) > 0:
-        #     assert self.hparams['additional_features'] != ''
-        #     assert self.aux_heads == False
-        #     x.update(x_add)
-        # if self.is_x_label:
-        #     x.update({'x_label': x_label})
+        # fmri
+        x = {k: self.ch_response[k](v) for k, v in x.items()}
 
-        out = self.final_fusion(out_aux)
+        out = {}
+        for roi in self.rois:
+            roi_out_auxs = []
+            for k, v in x.items():
+                if roi not in k:
+                    continue
+                roi_out_auxs.append(v)
+            roi_out = self.final_fusions[roi](roi_out_auxs)
+            out[roi] = roi_out
+
+        out_aux = x
+        # for x_i in self.pyramid_layers:
+        #     for pathway in self.pathways:
+        #         roi_out_auxs = []
+        #         for roi in self.rois:
+        #             k = f'{roi}_{pathway}_{x_i}'
+        #             roi_out_auxs.append(x[k])
+        #         roi_out_auxs = torch.cat(roi_out_auxs, -1)
+        #         out_aux[f'{pathway}_{x_i}'] = roi_out_auxs
+
         return out, out_aux
 
     def pyramid_pathway(self, x, layers, pathways):
-        for pathway in pathways:
+        for roi in self.rois:
+            for pathway in pathways:
 
-            if pathway == 'bottomup':
-                layers_iter = layers
-            elif pathway == 'topdown':
-                layers_iter = reversed(layers)
-            else:
-                NotImplementedError()
-
-            for i, x_i in enumerate(layers_iter):
-                k = f'{pathway}_{x_i}'
-                if i == 0:
-                    pass
+                if pathway == 'bottomup':
+                    layers_iter = layers
+                elif pathway == 'topdown':
+                    layers_iter = reversed(layers)
+                elif pathway == 'none':
+                    continue
                 else:
-                    x[k] = self.resample_and_add(prev, x[k])
-                x[k] = self.smooths[k](x[k])
-                prev = x[k]
+                    NotImplementedError()
+
+                for i, x_i in enumerate(layers_iter):
+                    k = f'{roi}_{pathway}_{x_i}'
+                    if i == 0:
+                        pass
+                    else:
+                        x[k] = self.resample_and_add(prev, x[k])
+                    x[k] = self.smooths[k](x[k])
+                    prev = x[k]
         return x
 
     @staticmethod

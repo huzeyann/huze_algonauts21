@@ -253,7 +253,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                 subs=self.subs,
                 preprocessing_type=self.preprocessing_type,
             )
-            self.roi_lens = algonauts_full.idx_ends.tolist()
+            self.idx_ends = algonauts_full.idx_ends
 
             if not self.use_cv:
                 num_train = int(self.train_full_len * (1 - self.val_ratio))
