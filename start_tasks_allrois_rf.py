@@ -39,7 +39,7 @@ for rf in rfs:
                              name=template_task.name + f'{roi}',
                              parent=template_task.id)
 
-    cloned_task.add_tags([roi, layer])
+    cloned_task.add_tags([roi, layer, str(rf)])
 
     cloned_task_parameters = cloned_task.get_parameters()
     # cloned_task_parameters['rois'] = [roi]
@@ -57,9 +57,9 @@ for rf in rfs:
     cloned_task_parameters['Args/freeze_bn'] = True
     cloned_task_parameters['Args/detach_aux'] = True
     cloned_task_parameters['Args/separate_rois'] = True
-    cloned_task_parameters['Args/early_stop_epochs'] = 10
-    cloned_task_parameters['Args/max_epochs'] = 10
-    cloned_task_parameters['Args/backbone_freeze_epochs'] = 10
+    cloned_task_parameters['Args/early_stop_epochs'] = 20
+    cloned_task_parameters['Args/max_epochs'] = 20
+    cloned_task_parameters['Args/backbone_freeze_epochs'] = 20
     cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
     # cloned_task_parameters['Args/x1_pooling_mode'] = 'spp'
     cloned_task_parameters['Args/pooling_mode'] = 'max'

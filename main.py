@@ -185,7 +185,7 @@ class LitModel(LightningModule):
             out, out_aux = self(x)
 
             loss_all = 0
-            for roi, yy in zip(self.rois, torch.hsplit(y, self.hparams.idx_ends.tolist())):
+            for roi, yy in zip(self.rois, torch.hsplit(y, self.hparams.idx_ends)):
 
                 loss = F.mse_loss(out[roi], yy)
                 if is_log:
@@ -274,7 +274,7 @@ class LitModel(LightningModule):
     def validation_epoch_end(self, val_step_outputs) -> None:
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
         avg_val_corr = []
-        for roi, yy in zip(self.rois, torch.hsplit(val_ys, self.hparams.idx_ends.tolist())):
+        for roi, yy in zip(self.rois, torch.hsplit(val_ys, self.hparams.idx_ends)):
             val_outs = torch.cat([out['out'][roi] for out in val_step_outputs], 0)
             val_corr = vectorized_correlation(val_outs, yy).mean().item()
             avg_val_corr.append(val_corr)
@@ -444,9 +444,9 @@ def train(args):
 
     hparams['output_size'] = dm.num_voxels
     hparams['idx_ends'] = dm.idx_ends
-    z = dm.idx_ends.copy()
+    z = np.array(dm.idx_ends).copy()
     z[1:] -= z[:-1].copy()
-    hparams['roi_lens'] = z
+    hparams['roi_lens'] = z.tolist()
 
     if args.predictions_dir:
         prediction_dir = os.path.join(args.predictions_dir, task.id)
