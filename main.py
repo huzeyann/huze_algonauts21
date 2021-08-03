@@ -22,7 +22,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts mix all layers'
+PROJECT_NAME = 'Algonauts mix layers spp'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -127,8 +127,12 @@ class LitModel(LightningModule):
         parser.add_argument('--pooling_size_x2', type=int, default=5)
         parser.add_argument('--pooling_size_x3', type=int, default=5)
         parser.add_argument('--pooling_size_x4', type=int, default=5)
-        parser.add_argument('--final_fusion', type=str, default='concat')
+        parser.add_argument('--spp_size_x1', type=int, nargs='+', help='SPP')
+        parser.add_argument('--spp_size_x2', type=int, nargs='+', help='SPP')
+        parser.add_argument('--spp_size_x3', type=int, nargs='+', help='SPP')
+        parser.add_argument('--spp_size_x4', type=int, nargs='+', help='SPP')
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
+        parser.add_argument('--final_fusion', type=str, default='conv')
         parser.add_argument('--bdcn_outputs', type=str, default='-1')
         parser.add_argument('--bdcn_pool_size', type=int, default=1)
         parser.add_argument('--lstm_layers', type=int, default=1)

@@ -419,10 +419,10 @@ class I3d_rgb(nn.Module):
             'x4': hparams['x4_pooling_mode'],
         }
         self.spp_level_dict = {
-            'x1': np.array([[1, 2, 2], [1, 5, 9], [1, 5, 9]]),
-            'x2': np.array([[1, 2, 2], [1, 5, 9], [1, 5, 9]]),
-            'x3': np.array([[1, 2, 2], [1, 5, 9], [1, 5, 9]]),
-            'x4': np.array([[1, 1], [1, 3], [1, 3]]),
+            'x1': np.array([[1, 2, 2], hparams['spp_size_x1'], hparams['spp_size_x1']]),
+            'x2': np.array([[1, 2, 2], hparams['spp_size_x2'], hparams['spp_size_x2']]),
+            'x3': np.array([[1, 2, 2], hparams['spp_size_x3'], hparams['spp_size_x3']]),
+            'x4': np.array([[1, 1, 1], hparams['spp_size_x4'], hparams['spp_size_x4']]),
         }
         if self.is_pyramid:
             assert len(self.pathways) >= 1 and self.pathways[0] != 'none'
