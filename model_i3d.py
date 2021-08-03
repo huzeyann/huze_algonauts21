@@ -393,11 +393,21 @@ class I3d_rgb(nn.Module):
     def __init__(self, hparams):
         super(I3d_rgb, self).__init__()
         self.hparams = hparams
-        self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
-        self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
-        self.x3_twh = tuple(map(lambda x: int(x / 2), self.x2_twh))
-        self.x4_twh = tuple(map(lambda x: int(x / 2), self.x3_twh))
-        self.x1_c, self.x2_c, self.x3_c, self.x4_c = 256, 512, 1024, 2048
+        if self.hparams.backbone_type == 'i3d_rgb':
+            self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
+            self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
+            self.x3_twh = tuple(map(lambda x: int(x / 2), self.x2_twh))
+            self.x4_twh = tuple(map(lambda x: int(x / 2), self.x3_twh))
+            self.x1_c, self.x2_c, self.x3_c, self.x4_c = 256, 512, 1024, 2048
+        elif self.hparams.backbone_type == 'i3d_flow':
+            assert hparams['video_frames'] == 224
+            self.x1_twh = (None, 28, 28)
+            self.x2_twh = (None, 14, 14)
+            self.x3_twh = (None, 7, 7)
+            self.x4_twh = (None, 7, 7)
+            self.x1_c, self.x2_c, self.x3_c, self.x4_c = 192, 480, 832, 1024
+        else:
+            NotImplementedError()
         self.twh_dict = {'x1': self.x1_twh, 'x2': self.x2_twh, 'x3': self.x3_twh, 'x4': self.x4_twh}
         self.c_dict = {'x1': self.x1_c, 'x2': self.x2_c, 'x3': self.x3_c, 'x4': self.x4_c}
         self.planes = hparams['conv_size']
@@ -419,10 +429,10 @@ class I3d_rgb(nn.Module):
             'x4': hparams['x4_pooling_mode'],
         }
         self.spp_level_dict = {
-            'x1': np.array([[1, 2, 2], hparams['spp_size_x1'], hparams['spp_size_x1']]),
-            'x2': np.array([[1, 2, 2], hparams['spp_size_x2'], hparams['spp_size_x2']]),
-            'x3': np.array([[1, 2, 2], hparams['spp_size_x3'], hparams['spp_size_x3']]),
-            'x4': np.array([[1, 1, 1], hparams['spp_size_x4'], hparams['spp_size_x4']]),
+            'x1': np.array([hparams['spp_size_t_x1'], hparams['spp_size_x1'], hparams['spp_size_x1']]),
+            'x2': np.array([hparams['spp_size_t_x2'], hparams['spp_size_x2'], hparams['spp_size_x2']]),
+            'x3': np.array([hparams['spp_size_t_x3'], hparams['spp_size_x3'], hparams['spp_size_x3']]),
+            'x4': np.array([hparams['spp_size_t_x4'], hparams['spp_size_x4'], hparams['spp_size_x4']]),
         }
         if self.is_pyramid:
             assert len(self.pathways) >= 1 and self.pathways[0] != 'none'
@@ -475,14 +485,14 @@ class I3d_rgb(nn.Module):
                                 2]) * self.planes})
                     elif self.pooling_modes[x_i] == 'adaptive_max':
                         size = hparams[f'pooling_size_{x_i}']
-                        size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
+                        size_t = hparams[f'pooling_size_t_{x_i}']
                         self.poolings.update({k: nn.Sequential(
                             nn.AdaptiveMaxPool3d((size_t, size, size)),
                             nn.Flatten())})
                         self.fc_input_dims.update({k: self.planes * size_t * size * size})
                     elif self.pooling_modes[x_i] == 'adaptive_avg':
                         size = hparams[f'pooling_size_{x_i}']
-                        size_t = 4 if x_i == 'x1' else self.twh_dict[x_i][0]
+                        size_t = hparams[f'pooling_size_t_{x_i}']
                         self.poolings.update({k: nn.Sequential(
                             nn.AdaptiveAvgPool3d((size_t, size, size)),
                             nn.Flatten())})

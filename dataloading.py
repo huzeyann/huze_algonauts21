@@ -123,6 +123,18 @@ def wrap_load_fmris(root, file_list):
     return fmris
 
 
+class ScaleTo1_1(object):
+
+    def __call__(self, tensor: torch.FloatTensor) -> torch.FloatTensor:
+        return (2 * tensor / 255) - 1
+
+
+class Permute(object):
+
+    def __call__(self, tensor: torch.FloatTensor) -> torch.FloatTensor:
+        return tensor.permute(1, 0, 2, 3)
+
+
 class AlgonautsDataset(Dataset):
     def __init__(self, dataset_dir,
                  additional_features='',
@@ -141,7 +153,10 @@ class AlgonautsDataset(Dataset):
         self.train = train
         self.dataset_dir = dataset_dir
         self.subs = [f'sub{i + 1:02d}' for i in range(10)] if subs == 'all' else subs.split(',')
-        csv = 'train_val.csv' if train else 'full_vid.csv'
+        if self.train:
+            csv = 'train_val-mini.csv' if self.track == 'mini_track' else 'train_val-full.csv'
+        else:
+            csv = 'full_vid.csv'
         csv_path = os.path.join(self.dataset_dir, csv)
         self.file_df = pd.read_csv(csv_path)
         self.vid_file_list = self.file_df['vid'].values
@@ -179,6 +194,7 @@ class AlgonautsDataset(Dataset):
                 NotImplementedError()
         else:
             self.cached_dir = os.path.join(self.dataset_dir, 'numpy')
+            assert self.preprocessing_type == 'i3d_flow'
 
         self.np_paths = [os.path.join(self.cached_dir, os.path.basename(f).replace('.mp4', '.npy'))
                          for f in self.vid_file_list]
@@ -186,19 +202,16 @@ class AlgonautsDataset(Dataset):
         # load fmri
         if train:
             if self.track == 'mini_track':
-                self.fmris = []
-                for roi in self.rois.split(','):
-                    fmri = wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
-                                           self.file_df[roi].values)
-                    self.fmris.append(fmri)
+                fmri_dir = 'fmris-mini'
                 self.fmris, self.idx_ends = concat_and_mask(
-                    [wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'),
+                    [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir),
                                      self.file_df[roi].values)
                      for roi in self.rois.split(',')])
             elif self.track == 'full_track':
+                fmri_dir = 'fmris-full'
                 assert self.rois == 'WB'
                 self.fmris, self.idx_ends = concat_and_mask(
-                    [wrap_load_fmris(os.path.join(self.dataset_dir, 'fmris'), self.file_df[sub].values)
+                    [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir), self.file_df[sub].values)
                      for sub in self.subs])
 
     def __len__(self):
@@ -207,6 +220,8 @@ class AlgonautsDataset(Dataset):
     def __getitem__(self, index):
 
         vid = np.load(self.np_paths[index])
+        if self.preprocessing_type == 'i3d_flow':
+            vid = self.i3d_flow_transform(vid)
 
         x = {'video': vid}
         additional_features = {af: self.features[af][index] for af in self.additional_features}
@@ -217,6 +232,13 @@ class AlgonautsDataset(Dataset):
             return x, y
         else:
             return x
+
+    def i3d_flow_transform(self, input):
+        i3d_transforms = transforms.Compose([
+            ScaleTo1_1(),
+            Permute()
+        ])
+        return i3d_transforms(input)
 
 
 class AlgonautsDataModule(pl.LightningDataModule):

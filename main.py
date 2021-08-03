@@ -14,6 +14,7 @@ from callbacks import ReduceAuxLossWeight
 from bdcn import load_bdcn
 from bdcn_edge import BDCNNeck
 from dataloading import AlgonautsDataModule
+from i3d_flow import load_i3d_flow
 from model_i3d import *
 from sam import SAM
 from utils import *
@@ -127,10 +128,18 @@ class LitModel(LightningModule):
         parser.add_argument('--pooling_size_x2', type=int, default=5)
         parser.add_argument('--pooling_size_x3', type=int, default=5)
         parser.add_argument('--pooling_size_x4', type=int, default=5)
+        parser.add_argument('--pooling_size_t_x1', type=int, default=4)
+        parser.add_argument('--pooling_size_t_x2', type=int, default=4)
+        parser.add_argument('--pooling_size_t_x3', type=int, default=2)
+        parser.add_argument('--pooling_size_t_x4', type=int, default=1)
         parser.add_argument('--spp_size_x1', type=int, nargs='+', help='SPP')
         parser.add_argument('--spp_size_x2', type=int, nargs='+', help='SPP')
         parser.add_argument('--spp_size_x3', type=int, nargs='+', help='SPP')
         parser.add_argument('--spp_size_x4', type=int, nargs='+', help='SPP')
+        parser.add_argument('--spp_size_t_x1', type=int, nargs='+', help='SPP', default=[1, 2, 2])
+        parser.add_argument('--spp_size_t_x2', type=int, nargs='+', help='SPP', default=[1, 2, 2])
+        parser.add_argument('--spp_size_t_x3', type=int, nargs='+', help='SPP', default=[1, 2, 2])
+        parser.add_argument('--spp_size_t_x4', type=int, nargs='+', help='SPP', default=[1, 1, 1])
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--final_fusion', type=str, default='conv')
         parser.add_argument('--bdcn_outputs', type=str, default='-1')
@@ -361,6 +370,9 @@ class LitModel(LightningModule):
 def train(args):
     hparams = vars(args)
 
+    if args.backbone_type == 'i3d_flow':
+        assert args.load_from_np
+
     dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
                              num_frames=args.video_frames, resolution=args.video_size, track=args.track,
                              cached=args.cached, val_ratio=args.val_ratio,
@@ -423,6 +435,8 @@ def train(args):
         backbone = modify_resnets_patrial_x_all(multi_resnet3d50(cache_dir=args.cache_dir))
     elif args.backbone_type == 'bdcn_edge':
         backbone = load_bdcn(args.bdcn_path)
+    elif args.backbone_type == 'i3d_flow':
+        backbone = load_i3d_flow(args.i3d_flow_path)
     else:
         NotImplementedError()
 
@@ -502,10 +516,12 @@ if __name__ == '__main__':
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
     parser.add_argument('--bdcn_path', type=str,
                         default='/home/huze/my_algonauts/bdcn-final-model/bdcn_pretrained_on_bsds500.pth')
+    parser.add_argument('--i3d_flow_path', type=str,
+                        default='/home/huze/my_algonauts/i3d-flow-model/i3d_flow.pt')
     parser.add_argument('--additional_features', type=str, default='')
     parser.add_argument('--additional_features_dir', type=str, default='/data_smr/huze/projects/my_algonauts/features/')
     parser.add_argument('--track', type=str, default='mini_track')
-    parser.add_argument('--backbone_type', type=str, default='i3d_rgb', help='i3d_rgb, bdcn_edge')
+    parser.add_argument('--backbone_type', type=str, default='i3d_rgb', help='i3d_rgb, bdcn_edge, i3d_flow')
     parser.add_argument('--rois', type=str, default="EBA")
     parser.add_argument('--subs', type=str, default="all")
     parser.add_argument('--num_subs', type=int, default=10)
@@ -518,7 +534,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
     parser.add_argument('--use_cv', default=False, action="store_true")
     parser.add_argument('--fold', type=int, default=-1)
-    parser.add_argument('--preprocessing_type', type=str, default='mmit', help='mmit, bdcn')
+    parser.add_argument('--preprocessing_type', type=str, default='mmit', help='mmit, bdcn, i3d_flow')
     parser.add_argument('--early_stop_epochs', type=int, default=10)
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")
