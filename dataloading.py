@@ -414,15 +414,15 @@ class AlgonautsDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size,
-                          shuffle=True, num_workers=8, pin_memory=False, prefetch_factor=4)
+                          shuffle=True, num_workers=8, pin_memory=False, prefetch_factor=2)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size,
-                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=4)
+                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=2)
 
     def predict_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size,
-                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=4)
+                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=2)
 
     def teardown(self, stage: Optional[str] = None):
         # Used to clean-up when the run is finished

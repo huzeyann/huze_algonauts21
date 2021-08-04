@@ -27,10 +27,10 @@ task_ids = []
 
 roi = 'V1,V2,V3,V4,EBA,LOC,STS,FFA,PPA'
 rfs = list(range(1, 14 + 1))
-rf_ts = [1, 2, 4, 6, 8]
+rf_ts = [1, 2, 3, 4]
 
-for rf in rfs:
-    for rf_t in rf_ts:
+for rf_t in rf_ts:
+    for rf in rfs:
         if rf > 7:
             layer = 'x1,x2'
         else:
