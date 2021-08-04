@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
+from typing import Any, Optional
 
 import kornia as K
+from kornia.augmentation import RandomCrop3D, CenterCrop3D
 import pytorch_lightning as pl
 from adabelief_pytorch import AdaBelief
 from pytorch_lightning.callbacks import BackboneFinetuning, ModelCheckpoint, EarlyStopping, StochasticWeightAveraging
@@ -71,15 +73,23 @@ class LitModel(LightningModule):
 
         # self.automatic_optimization = False
 
-        # self.train_transform = DataAugmentation()
-        self.train_transform = None
+        if self.hparams.crop_size > 0:
+            if self.hparams.random_crop:
+                self.train_transform = RandomCrop3D(
+                    (self.hparams.video_frames, self.hparams.crop_size, self.hparams.crop_size))
+            else:
+                self.train_transform = TensorCenterCrop(self.hparams.crop_size)
+            self.test_transform = TensorCenterCrop(self.hparams.crop_size)
+        else:
+            self.train_transform = None
+            self.test_transform = None
 
         self.backbone = backbone
 
         # self.backbone = nn.SyncBatchNorm.convert_sync_batchnorm(backbone) # slooooow
 
-        if self.hparams.backbone_type == 'i3d_rgb':
-            self.neck = I3d_rgb(self.hparams)
+        if self.hparams.backbone_type == 'i3d_rgb' or self.hparams.backbone_type == 'i3d_flow':
+            self.neck = I3d_neck(self.hparams)
         elif self.hparams.backbone_type == 'bdcn_edge':
             self.neck = BDCNNeck(self.hparams)
         else:
@@ -250,7 +260,7 @@ class LitModel(LightningModule):
         if self.hparams.freeze_bn:
             self.backbone.apply(disable_bn)
         x, y = batch
-        x = self.train_transform(x) if self.train_transform is not None else x
+        x['video'] = self.train_transform(x['video']) if self.train_transform is not None else x['video']
         batch = (x, y)
 
         out, loss, _ = self._shared_train_val(batch, batch_idx, 'train')
@@ -279,10 +289,18 @@ class LitModel(LightningModule):
     #         optimizer.step()
 
     def validation_step(self, batch, batch_idx):
+        x, y = batch
+        x['video'] = self.test_transform(x['video']) if self.test_transform is not None else x['video']
+        batch = (x, y)
         out, loss, out_aux = self._shared_train_val(batch, batch_idx, 'val')
         y = batch[-1]
         # self.val_corr(out[:, 0], y[:, 0])
         return {'out': out, 'y': y, 'out_aux': out_aux}
+
+    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: Optional[int] = None) -> Any:
+        x, y = batch
+        x['video'] = self.test_transform(x['video']) if self.test_transform is not None else x['video']
+        return self(x)
 
     def validation_epoch_end(self, val_step_outputs) -> None:
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
@@ -291,28 +309,28 @@ class LitModel(LightningModule):
             val_outs = torch.cat([out['out'][roi] for out in val_step_outputs], 0)
             val_corr = vectorized_correlation(val_outs, yy).mean().item()
             avg_val_corr.append(val_corr)
-        # print(val_corr.mean())
+            # print(val_corr.mean())
             self.log(f'val_corr/{roi}_final', val_corr, prog_bar=True, logger=True, sync_dist=False)
-        # Logger.current_logger().report_scalar(
-        #     "validation", "correlation", iteration=self.global_step, value=val_corr)
+            # Logger.current_logger().report_scalar(
+            #     "validation", "correlation", iteration=self.global_step, value=val_corr)
 
-        # def roi_correlation(x, y, roi_lens, roi_names):
-        #     xx = torch.hsplit(x, roi_lens)[:-1]
-        #     yy = torch.hsplit(y, roi_lens)[:-1]
-        #
-        #     corrs_dict = {}
-        #     i = 0
-        #     for roi in roi_names:
-        #         a, b = xx[i], yy[i]
-        #         corr = vectorized_correlation(a, b).mean().item()
-        #         corrs_dict[roi] = corr
-        #         i += 1
-        #
-        #     return corrs_dict
+            # def roi_correlation(x, y, roi_lens, roi_names):
+            #     xx = torch.hsplit(x, roi_lens)[:-1]
+            #     yy = torch.hsplit(y, roi_lens)[:-1]
+            #
+            #     corrs_dict = {}
+            #     i = 0
+            #     for roi in roi_names:
+            #         a, b = xx[i], yy[i]
+            #         corr = vectorized_correlation(a, b).mean().item()
+            #         corrs_dict[roi] = corr
+            #         i += 1
+            #
+            #     return corrs_dict
 
-        # for roi, corr in roi_correlation(val_outs, val_ys, self.hparams.idx_ends.tolist(),
-        #                                  self.hparams.rois.split(',')).items():
-        #     self.log(f'val_corr/{roi}_final', corr, logger=True, sync_dist=False)
+            # for roi, corr in roi_correlation(val_outs, val_ys, self.hparams.idx_ends.tolist(),
+            #                                  self.hparams.rois.split(',')).items():
+            #     self.log(f'val_corr/{roi}_final', corr, logger=True, sync_dist=False)
 
             # aux heads
             if val_step_outputs[0]['out_aux'] is not None:
@@ -510,6 +528,8 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--video_frames', type=int, default=16)
     parser.add_argument('--video_size', type=int, default=288)
+    parser.add_argument('--crop_size', type=int, default=0)
+    parser.add_argument('--random_crop', default=False, action="store_true")
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--accumulate_grad_batches', type=int, default=1)
     parser.add_argument('--max_epochs', type=int, default=300)

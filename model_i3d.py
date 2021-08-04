@@ -388,23 +388,24 @@ class ConvFusion(nn.Module):
         return out
 
 
-class I3d_rgb(nn.Module):
+class I3d_neck(nn.Module):
 
     def __init__(self, hparams):
-        super(I3d_rgb, self).__init__()
+        super(I3d_neck, self).__init__()
         self.hparams = hparams
         if self.hparams.backbone_type == 'i3d_rgb':
-            self.x1_twh = (int(hparams['video_frames'] / 2), int(hparams['video_size'] / 4), int(hparams['video_size'] / 4))
+            video_size = hparams['video_size'] if hparams['crop_size'] == 0 else hparams['crop_size']
+            self.x1_twh = (int(hparams['video_frames'] / 2), int(video_size / 4), int(video_size / 4))
             self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
             self.x3_twh = tuple(map(lambda x: int(x / 2), self.x2_twh))
             self.x4_twh = tuple(map(lambda x: int(x / 2), self.x3_twh))
             self.x1_c, self.x2_c, self.x3_c, self.x4_c = 256, 512, 1024, 2048
         elif self.hparams.backbone_type == 'i3d_flow':
-            assert hparams['video_frames'] == 224
-            self.x1_twh = (None, 28, 28)
-            self.x2_twh = (None, 14, 14)
-            self.x3_twh = (None, 7, 7)
-            self.x4_twh = (None, 7, 7)
+            assert hparams['crop_size'] == 224 and hparams['video_frames'] == 64
+            self.x1_twh = (32, 28, 28)
+            self.x2_twh = (16, 14, 14)
+            self.x3_twh = (8, 7, 7)
+            self.x4_twh = (8, 7, 7)
             self.x1_c, self.x2_c, self.x3_c, self.x4_c = 192, 480, 832, 1024
         else:
             NotImplementedError()

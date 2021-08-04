@@ -123,6 +123,11 @@ def wrap_load_fmris(root, file_list):
     return fmris
 
 
+class ToTensor(object):
+
+    def __call__(self, arr):
+        return torch.tensor(arr)
+
 class ScaleTo1_1(object):
 
     def __call__(self, tensor: torch.FloatTensor) -> torch.FloatTensor:
@@ -142,6 +147,7 @@ class AlgonautsDataset(Dataset):
                  rois='EBA', num_frames=16, resolution=288,
                  train=True, cached=True, track='mini_track', subs='all',
                  preprocessing_type='mmit', load_from_np=False):
+        self.track = track
         self.load_from_np = load_from_np
         self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
@@ -161,7 +167,6 @@ class AlgonautsDataset(Dataset):
         self.file_df = pd.read_csv(csv_path)
         self.vid_file_list = self.file_df['vid'].values
         self.vid_root = os.path.join(self.dataset_dir, 'videos')
-        self.track = track
         if self.track == 'full_track':
             assert self.rois == 'WB'
 
@@ -235,6 +240,7 @@ class AlgonautsDataset(Dataset):
 
     def i3d_flow_transform(self, input):
         i3d_transforms = transforms.Compose([
+            ToTensor(),
             ScaleTo1_1(),
             Permute()
         ])
@@ -278,7 +284,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
         self.rois = rois
         self.datasets_dir = datasets_dir
         self.train_full_len = 1000
-        self.file_list = ['train_val.csv', 'full_vid.csv']
+        self.file_list = ['train_val-mini.csv', 'train_val-full.csv', 'full_vid.csv']
         self.file_list = [os.path.join(self.datasets_dir, f) for f in self.file_list]
         self.batch_size = batch_size
 

@@ -14,6 +14,21 @@ import torch
 from tqdm import tqdm
 from torch import nn
 
+
+class TensorCenterCrop(object):
+
+    def __init__(self, crop_size: int) -> None:
+        self.crop_size = crop_size
+
+    def __call__(self, tensor: torch.FloatTensor) -> torch.FloatTensor:
+        H, W = tensor.size(-2), tensor.size(-1)
+        from_H = ((H - self.crop_size) // 2)
+        from_W = ((W - self.crop_size) // 2)
+        to_H = from_H + self.crop_size
+        to_W = from_W + self.crop_size
+        return tensor[..., from_H:to_H, from_W:to_W]
+
+
 def disable_bn(model):
     for module in model.modules():
         if isinstance(module, nn.BatchNorm3d):
