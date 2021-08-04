@@ -460,7 +460,7 @@ class I3d_neck(nn.Module):
                         self.first_convs.update({k: nn.Flatten()})
                         self.poolings.update({k: nn.Flatten()})
                         self.ch_response.update({k: build_fc(hparams, 1024, output_size)})
-                        print(self.ch_response)
+                        # print(self.ch_response)
                         continue
 
                     self.first_convs.update(
