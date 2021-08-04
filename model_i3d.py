@@ -455,6 +455,14 @@ class I3d_neck(nn.Module):
             for x_i in self.pyramid_layers:
                 for pathway in self.pathways:
                     k = f'{roi}_{pathway}_{x_i}'
+
+                    if x_i == 'x5':  # i3d_flow
+                        self.first_convs.update({k: nn.Flatten()})
+                        self.poolings.update({k: nn.Flatten()})
+                        self.ch_response.update({k: build_fc(hparams, 1024, output_size)})
+                        print(self.ch_response)
+                        continue
+
                     self.first_convs.update(
                         {k: nn.Conv3d(self.c_dict[x_i], self.planes, kernel_size=1, stride=1)})
 

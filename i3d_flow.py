@@ -237,6 +237,7 @@ class I3D(torch.nn.Module):
     # (v-iashin) adding features arg to have an ability to output features
     def forward(self, inp):
 
+        self.eval()
         # Preprocessing
         out = self.conv3d_1a_7x7(inp)
         out = self.maxPool3d_2a_3x3(out)
@@ -255,20 +256,20 @@ class I3D(torch.nn.Module):
         out = self.mixed_5b(x3)
         x4 = self.mixed_5c(out)  # <- [1,  832, 8 (for T=64) or 3 (for T=24), 1, 1]
         out = self.avg_pool(x4)  # <- [1, 1024, 8 (for T=64) or 3 (for T=24), 1, 1]
-        out = self.dropout(out)
-        out = self.conv3d_0c_1x1(out)
+        # out = self.dropout(out)
+        # out = self.conv3d_0c_1x1(out)
         out = out.squeeze(3)
         out = out.squeeze(3)
         out = out.mean(2)
-        out_logits = out
-        out = self.softmax(out_logits)
+        # out_logits = out
+        # out = self.softmax(out_logits)
 
         out_dict = {
             'x1': x1,
             'x2': x2,
             'x3': x3,
             'x4': x4,
-            'x_label': out
+            'x5': out
         }
 
         return out_dict
