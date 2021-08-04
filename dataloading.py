@@ -128,6 +128,7 @@ class ToTensor(object):
     def __call__(self, arr):
         return torch.tensor(arr)
 
+
 class ScaleTo1_1(object):
 
     def __call__(self, tensor: torch.FloatTensor) -> torch.FloatTensor:
@@ -140,15 +141,65 @@ class Permute(object):
         return tensor.permute(1, 0, 2, 3)
 
 
+class AlgonautsDatasetI3dFreeze(Dataset):
+    def __init__(self, dataset_dir, rois='EBA',
+                 train=True, cached=True, track='mini_track', subs='all'):
+        self.track = track
+        self.cached = cached
+        self.rois = rois
+        self.train = train
+        self.dataset_dir = dataset_dir
+        self.subs = [f'sub{i + 1:02d}' for i in range(10)] if subs == 'all' else subs.split(',')
+        if self.train:
+            csv = 'train_val-mini.csv' if self.track == 'mini_track' else 'train_val-full.csv'
+        else:
+            csv = 'full_vid.csv'
+        csv_path = os.path.join(self.dataset_dir, csv)
+        self.file_df = pd.read_csv(csv_path)
+        self.vid_file_list = self.file_df['vid'].values
+        self.vid_file_list = [x.replace('.mp4', '_flow.pkl') for x in self.vid_file_list]
+        self.vid_root = os.path.join(self.dataset_dir, 'numpy')
+        if self.track == 'full_track':
+            assert self.rois == 'WB'
+
+        # load fmri
+        if train:
+            if self.track == 'mini_track':
+                fmri_dir = 'fmris-mini'
+                self.fmris, self.idx_ends = concat_and_mask(
+                    [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir),
+                                     self.file_df[roi].values)
+                     for roi in self.rois.split(',')])
+            elif self.track == 'full_track':
+                fmri_dir = 'fmris-full'
+                assert self.rois == 'WB'
+                self.fmris, self.idx_ends = concat_and_mask(
+                    [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir), self.file_df[sub].values)
+                     for sub in self.subs])
+
+    def __len__(self):
+        return len(self.vid_file_list)
+
+    def __getitem__(self, index):
+
+        x = np.load(os.path.join(self.vid_root, self.vid_file_list[index]), allow_pickle=True)
+        x = {k: torch.tensor(v).squeeze(0) for k, v in x.items()}
+
+        if self.train:
+            y = self.fmris[index]
+            return x, y
+        else:
+            return x
+
+
 class AlgonautsDataset(Dataset):
     def __init__(self, dataset_dir,
                  additional_features='',
                  additional_features_dir='',
                  rois='EBA', num_frames=16, resolution=288,
                  train=True, cached=True, track='mini_track', subs='all',
-                 preprocessing_type='mmit', load_from_np=False):
+                 preprocessing_type='mmit'):
         self.track = track
-        self.load_from_np = load_from_np
         self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
         self.additional_features = additional_features
@@ -180,26 +231,22 @@ class AlgonautsDataset(Dataset):
         else:
             self.additional_features = []
 
-        if not self.load_from_np:
-            if self.cached:
-                self.cached_dir = os.path.join(self.dataset_dir,
-                                               f'{self.resolution}_{self.num_frames}_{self.preprocessing_type}_npy')
-                # save to np
-                os.makedirs(self.cached_dir, exist_ok=True)
-                for file in tqdm(self.vid_file_list):
-                    name = os.path.basename(file).replace('.mp4', '.npy')
-                    path = os.path.join(self.cached_dir, name)
-                    if not os.path.exists(path):
-                        vid = wrap_load_one_video(self.vid_root, file,
-                                                  num_frames=self.num_frames,
-                                                  resolution=self.resolution,
-                                                  preprocessing_type=self.preprocessing_type)
-                        np.save(path, vid.numpy())
-            else:
-                NotImplementedError()
+        if self.cached:
+            self.cached_dir = os.path.join(self.dataset_dir,
+                                           f'{self.resolution}_{self.num_frames}_{self.preprocessing_type}_npy')
+            # save to np
+            os.makedirs(self.cached_dir, exist_ok=True)
+            for file in tqdm(self.vid_file_list):
+                name = os.path.basename(file).replace('.mp4', '.npy')
+                path = os.path.join(self.cached_dir, name)
+                if not os.path.exists(path):
+                    vid = wrap_load_one_video(self.vid_root, file,
+                                              num_frames=self.num_frames,
+                                              resolution=self.resolution,
+                                              preprocessing_type=self.preprocessing_type)
+                    np.save(path, vid.numpy())
         else:
-            self.cached_dir = os.path.join(self.dataset_dir, 'numpy')
-            assert self.preprocessing_type == 'i3d_flow'
+            NotImplementedError()
 
         self.np_paths = [os.path.join(self.cached_dir, os.path.basename(f).replace('.mp4', '.npy'))
                          for f in self.vid_file_list]
@@ -225,8 +272,6 @@ class AlgonautsDataset(Dataset):
     def __getitem__(self, index):
 
         vid = np.load(self.np_paths[index])
-        if self.preprocessing_type == 'i3d_flow':
-            vid = self.i3d_flow_transform(vid)
 
         x = {'video': vid}
         additional_features = {af: self.features[af][index] for af in self.additional_features}
@@ -237,14 +282,6 @@ class AlgonautsDataset(Dataset):
             return x, y
         else:
             return x
-
-    def i3d_flow_transform(self, input):
-        i3d_transforms = transforms.Compose([
-            ToTensor(),
-            ScaleTo1_1(),
-            Permute()
-        ])
-        return i3d_transforms(input)
 
 
 class AlgonautsDataModule(pl.LightningDataModule):
@@ -303,20 +340,29 @@ class AlgonautsDataModule(pl.LightningDataModule):
 
         # Assign Train/val split(s) for use in Dataloaders
         if stage in (None, 'fit'):
-            self.algonauts_full = AlgonautsDataset(
-                self.datasets_dir,
-                additional_features=self.additional_features,
-                additional_features_dir=self.additional_features_dir,
-                train=True,
-                rois=self.rois,
-                num_frames=self.num_frames,
-                resolution=self.resolution,
-                cached=self.cached,
-                track=self.track,
-                subs=self.subs,
-                preprocessing_type=self.preprocessing_type,
-                load_from_np=self.load_from_np,
-            )
+            if not self.load_from_np:
+                self.algonauts_full = AlgonautsDataset(
+                    self.datasets_dir,
+                    additional_features=self.additional_features,
+                    additional_features_dir=self.additional_features_dir,
+                    train=True,
+                    rois=self.rois,
+                    num_frames=self.num_frames,
+                    resolution=self.resolution,
+                    cached=self.cached,
+                    track=self.track,
+                    subs=self.subs,
+                    preprocessing_type=self.preprocessing_type,
+                )
+            else:
+                self.algonauts_full = AlgonautsDatasetI3dFreeze(
+                    self.datasets_dir,
+                    train=True,
+                    rois=self.rois,
+                    cached=self.cached,
+                    track=self.track,
+                    subs=self.subs,
+                )
             self.idx_ends = self.algonauts_full.idx_ends.tolist()
 
             if not self.use_cv:
@@ -342,32 +388,41 @@ class AlgonautsDataModule(pl.LightningDataModule):
 
         # Assign Test split(s) for use in Dataloaders
         if stage in (None, 'test'):
-            self.test_dataset = AlgonautsDataset(
-                self.datasets_dir,
-                additional_features=self.additional_features,
-                additional_features_dir=self.additional_features_dir,
-                train=False,
-                rois=self.rois,
-                num_frames=self.num_frames,
-                resolution=self.resolution,
-                cached=self.cached,
-                track=self.track,
-                subs=self.subs,
-                preprocessing_type=self.preprocessing_type,
-                load_from_np=self.load_from_np,
-            )
+            if not self.load_from_np:
+                self.test_dataset = AlgonautsDataset(
+                    self.datasets_dir,
+                    additional_features=self.additional_features,
+                    additional_features_dir=self.additional_features_dir,
+                    train=False,
+                    rois=self.rois,
+                    num_frames=self.num_frames,
+                    resolution=self.resolution,
+                    cached=self.cached,
+                    track=self.track,
+                    subs=self.subs,
+                    preprocessing_type=self.preprocessing_type,
+                )
+            else:
+                self.test_dataset = AlgonautsDatasetI3dFreeze(
+                    self.datasets_dir,
+                    train=False,
+                    rois=self.rois,
+                    cached=self.cached,
+                    track=self.track,
+                    subs=self.subs,
+                )
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size,
-                          shuffle=True, num_workers=8, pin_memory=False, prefetch_factor=2)
+                          shuffle=True, num_workers=8, pin_memory=False, prefetch_factor=4)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size,
-                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=2)
+                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=4)
 
     def predict_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size,
-                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=2)
+                          shuffle=False, num_workers=8, pin_memory=False, prefetch_factor=4)
 
     def teardown(self, stage: Optional[str] = None):
         # Used to clean-up when the run is finished

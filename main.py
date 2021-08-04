@@ -25,7 +25,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts mix layers spp'
+PROJECT_NAME = 'Algonauts i3d_flow freezed search rf'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -168,7 +168,6 @@ class LitModel(LightningModule):
         parser.add_argument('--no_convtrans', default=False, action="store_true")
         parser.add_argument('--separate_rois', default=False, action="store_true")
         # legacy
-        parser.add_argument('--softpool', default=False, action="store_true")
         parser.add_argument('--fc_batch_norm', default=False, action="store_true")
         parser.add_argument('--global_pooling', default=False, action="store_true")
         return parser
@@ -177,26 +176,29 @@ class LitModel(LightningModule):
         self.logger.log_hyperparams(self.hparams)
 
     def forward(self, x):
-        x_vid = x['video']
-        # x_add = {k: v for k, v in x.items() if k != 'video'}
+        if not self.hparams.load_from_np:
+            x_vid = x['video']
+            # x_add = {k: v for k, v in x.items() if k != 'video'}
 
-        if self.hparams.backbone_type == 'bdcn_edge':
-            # if self.training == False:
-            #     self.logger.experiment.add_image('original', x_vid[0, :, -1, :, :], global_step=self.global_step, dataformats='CHW')
-            # vid to img
-            x_vid = x_vid.permute(0, 2, 1, 3, 4)
-            s = x_vid.shape
-            x_vid = x_vid.reshape(s[0] * s[1], *s[2:])
+            if self.hparams.backbone_type == 'bdcn_edge':
+                # if self.training == False:
+                #     self.logger.experiment.add_image('original', x_vid[0, :, -1, :, :], global_step=self.global_step, dataformats='CHW')
+                # vid to img
+                x_vid = x_vid.permute(0, 2, 1, 3, 4)
+                s = x_vid.shape
+                x_vid = x_vid.reshape(s[0] * s[1], *s[2:])
 
-        out_vid = self.backbone(x_vid)
+            out_vid = self.backbone(x_vid)
 
-        if self.hparams.backbone_type == 'bdcn_edge':
-            # img to vid
-            out_vid = [x.reshape(s[0], s[1], s[3], s[4]) for x in out_vid]
-            if self.training == False:
-                self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]),
-                                                 global_step=self.global_step, dataformats='HW')
-                # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
+            if self.hparams.backbone_type == 'bdcn_edge':
+                # img to vid
+                out_vid = [x.reshape(s[0], s[1], s[3], s[4]) for x in out_vid]
+                if self.training == False:
+                    self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]),
+                                                     global_step=self.global_step, dataformats='HW')
+                    # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
+        else:
+            out_vid = x
 
         # out = self.neck(out_vid, x_add)
         out = self.neck(out_vid)
@@ -260,7 +262,8 @@ class LitModel(LightningModule):
         if self.hparams.freeze_bn:
             self.backbone.apply(disable_bn)
         x, y = batch
-        x['video'] = self.train_transform(x['video']) if self.train_transform is not None else x['video']
+        if 'video' in x.keys():
+            x['video'] = self.train_transform(x['video']) if self.train_transform is not None else x['video']
         batch = (x, y)
 
         out, loss, _ = self._shared_train_val(batch, batch_idx, 'train')
@@ -290,7 +293,8 @@ class LitModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        x['video'] = self.test_transform(x['video']) if self.test_transform is not None else x['video']
+        if 'video' in x.keys():
+            x['video'] = self.test_transform(x['video']) if self.test_transform is not None else x['video']
         batch = (x, y)
         out, loss, out_aux = self._shared_train_val(batch, batch_idx, 'val')
         y = batch[-1]
@@ -299,7 +303,8 @@ class LitModel(LightningModule):
 
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: Optional[int] = None) -> Any:
         x, y = batch
-        x['video'] = self.test_transform(x['video']) if self.test_transform is not None else x['video']
+        if 'video' in x.keys():
+            x['video'] = self.test_transform(x['video']) if self.test_transform is not None else x['video']
         return self(x)
 
     def validation_epoch_end(self, val_step_outputs) -> None:
@@ -413,7 +418,7 @@ def train(args):
 
     early_stop_callback = EarlyStopping(
         monitor='val_corr/final',
-        min_delta=0.001,
+        min_delta=0.00,
         patience=int(args.early_stop_epochs / args.val_check_interval),
         verbose=False,
         mode='max'
@@ -455,6 +460,7 @@ def train(args):
         backbone = load_bdcn(args.bdcn_path)
     elif args.backbone_type == 'i3d_flow':
         backbone = load_i3d_flow(args.i3d_flow_path)
+        # backbone = None
     else:
         NotImplementedError()
 

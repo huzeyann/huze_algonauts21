@@ -210,7 +210,7 @@ class MiniFC(nn.Module):
                     levels = np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]])
                 elif hparams['backbone_type'] == 'x2':
                     levels = np.array([[1, 2, 4], [1, 2, 4], [1, 2, 4]])
-                self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'], hparams['softpool'])
+                self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'])
                 input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
 
         self.fc = build_fc(hparams, input_dim, hparams['output_size'])
@@ -401,7 +401,7 @@ class I3d_neck(nn.Module):
             self.x4_twh = tuple(map(lambda x: int(x / 2), self.x3_twh))
             self.x1_c, self.x2_c, self.x3_c, self.x4_c = 256, 512, 1024, 2048
         elif self.hparams.backbone_type == 'i3d_flow':
-            assert hparams['crop_size'] == 224 and hparams['video_frames'] == 64
+            assert self.hparams.load_from_np
             self.x1_twh = (32, 28, 28)
             self.x2_twh = (16, 14, 14)
             self.x3_twh = (8, 7, 7)
@@ -486,8 +486,7 @@ class I3d_neck(nn.Module):
                     elif self.pooling_modes[x_i] == 'spp':
                         self.poolings.update({k: nn.Sequential(
                             SpatialPyramidPooling(self.spp_level_dict[x_i],
-                                                  hparams['pooling_mode'],
-                                                  hparams['softpool']),
+                                                  hparams['pooling_mode']),
                             nn.Flatten())})
                         self.fc_input_dims.update({k: np.sum(
                             self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][
