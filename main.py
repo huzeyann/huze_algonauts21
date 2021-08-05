@@ -560,6 +560,7 @@ def train(args):
         for roi in rois:
             prediction = torch.cat([p[0][roi] for p in predictions], 0)
             torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
+        os.remove(checkpoint_callback.best_model_path)
 
 
 if __name__ == '__main__':
