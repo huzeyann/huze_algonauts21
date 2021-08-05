@@ -331,7 +331,7 @@ class LitModel(LightningModule):
         return {'out': out, 'y': y, 'out_aux': out_aux}
 
     def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: Optional[int] = None) -> Any:
-        x, y = batch
+        x = batch
         if 'video' in x.keys():
             x['video'] = self.test_transform(x['video']) if self.test_transform is not None else x['video']
         return self(x)
