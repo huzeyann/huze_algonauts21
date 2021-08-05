@@ -11,6 +11,8 @@ from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.plugins import DDPPlugin
 from torch import Tensor
 from torch.nn import SyncBatchNorm
+from torch.optim.lr_scheduler import MultiStepLR, StepLR
+
 from callbacks import ReduceAuxLossWeight
 
 from bdcn import load_bdcn
@@ -25,7 +27,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts i3d_flow V1'
+PROJECT_NAME = 'Algonauts roi-V1 extensive search'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -419,7 +421,11 @@ class LitModel(LightningModule):
         else:
             optimizer = SAM(optimizer_grouped_parameters, AdaBelief, adaptive=True, rho=0.5)
 
-        return [optimizer], []
+        scheduler = StepLR(optimizer, step_size=self.hparams.backbone_freeze_epochs, gamma=0.5)
+
+        return (
+            {"optimizer": optimizer, "lr_scheduler": scheduler},
+        )
 
 
 def train(args):
