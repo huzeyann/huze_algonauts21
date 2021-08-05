@@ -25,7 +25,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts i3d_flow freezed search rf'
+PROJECT_NAME = 'Algonauts i3d_flow V1'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -114,7 +114,10 @@ class LitModel(LightningModule):
         for roi in self.rois:
             for x_i in self.hparams.pyramid_layers.split(','):
                 for pathway in self.hparams.pathways.split(','):
-                    self.aux_loss_weights[f'{roi}_{pathway}_{x_i}'] = self.hparams.aux_loss_weight
+                    if self.hparams[f'aux_loss_weight_{x_i}'] >= 0:
+                        self.aux_loss_weights[f'{roi}_{pathway}_{x_i}'] = self.hparams[f'aux_loss_weight_{x_i}']
+                    else:
+                        self.aux_loss_weights[f'{roi}_{pathway}_{x_i}'] = self.hparams.aux_loss_weight
 
     @staticmethod
     def add_model_specific_args(parser):
@@ -152,13 +155,19 @@ class LitModel(LightningModule):
         parser.add_argument('--spp_size_t_x4', type=int, nargs='+', help='SPP', default=[1, 1, 1])
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--final_fusion', type=str, default='conv')
+        parser.add_argument('--old_mix', default=False, action="store_true")
         parser.add_argument('--bdcn_outputs', type=str, default='-1')
         parser.add_argument('--bdcn_pool_size', type=int, default=1)
         parser.add_argument('--lstm_layers', type=int, default=1)
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.0)
+        parser.add_argument('--aux_loss_weight_x1', type=float, default=0.0)
+        parser.add_argument('--aux_loss_weight_x2', type=float, default=-1)
+        parser.add_argument('--aux_loss_weight_x3', type=float, default=-1)
+        parser.add_argument('--aux_loss_weight_x4', type=float, default=-1)
+        parser.add_argument('--aux_loss_weight_x5', type=float, default=-1)
         parser.add_argument('--reduce_aux_loss_ratio', type=float, default=-1)
-        parser.add_argument('--reduce_aux_min_delta', type=float, default=0.01)
+        parser.add_argument('--reduce_aux_min_delta', type=float, default=0.0)
         parser.add_argument('--reduce_aux_patience', type=int, default=2)
         parser.add_argument('--detach_aux', default=False, action="store_true")
         parser.add_argument('--sample_voxels', default=False, action="store_true")
@@ -210,19 +219,39 @@ class LitModel(LightningModule):
             out, out_aux = self(x)
 
             loss_all = 0
-            for roi, yy in zip(self.rois, torch.hsplit(y, self.hparams.idx_ends)):
+            if self.hparams.separate_rois:
+                for roi, yy in zip(self.rois, torch.hsplit(y, self.hparams.idx_ends)):
 
-                loss = F.mse_loss(out[roi], yy)
+                    loss = F.mse_loss(out[roi], yy)
+                    if is_log:
+                        self.log(f'{prefix}_mse_loss/{roi}_final', loss,
+                                 on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+                    if out_aux is not None:
+                        aux_losses = []
+                        for k, oa in out_aux.items():
+                            if roi not in k: continue
+
+                            loss_aux = F.mse_loss(oa, yy)
+                            if is_log:
+                                self.log(f'{prefix}_mse_loss/{k}', loss_aux,
+                                         on_step=False, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+                            loss_aux *= self.aux_loss_weights[k]
+                            aux_losses.append(loss_aux)
+                        loss_aux = torch.stack(aux_losses).mean()
+                    else:
+                        loss_aux = 0
+
+                    loss_all = loss_all + loss + loss_aux
+            else:
+                loss = F.mse_loss(out[self.hparams.rois], y)
                 if is_log:
-                    self.log(f'{prefix}_mse_loss/{roi}_final', loss,
+                    self.log(f'{prefix}_mse_loss/{self.hparams.rois}_final', loss,
                              on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-
                 if out_aux is not None:
                     aux_losses = []
                     for k, oa in out_aux.items():
-                        if roi not in k: continue
-
-                        loss_aux = F.mse_loss(oa, yy)
+                        loss_aux = F.mse_loss(oa, y)
                         if is_log:
                             self.log(f'{prefix}_mse_loss/{k}', loss_aux,
                                      on_step=False, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
@@ -310,47 +339,50 @@ class LitModel(LightningModule):
     def validation_epoch_end(self, val_step_outputs) -> None:
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
         avg_val_corr = []
-        for roi, yy in zip(self.rois, torch.hsplit(val_ys, self.hparams.idx_ends)):
-            val_outs = torch.cat([out['out'][roi] for out in val_step_outputs], 0)
-            val_corr = vectorized_correlation(val_outs, yy).mean().item()
-            avg_val_corr.append(val_corr)
-            # print(val_corr.mean())
-            self.log(f'val_corr/{roi}_final', val_corr, prog_bar=True, logger=True, sync_dist=False)
+        if self.hparams.separate_rois:
+            for roi, yy in zip(self.rois, torch.hsplit(val_ys, self.hparams.idx_ends)):
+                val_outs = torch.cat([out['out'][roi] for out in val_step_outputs], 0)
+                val_corr = vectorized_correlation(val_outs, yy).mean().item()
+                avg_val_corr.append(val_corr)
+                # print(val_corr.mean())
+                self.log(f'val_corr/{roi}_final', val_corr, prog_bar=True, logger=True, sync_dist=False)
+
+                # aux heads
+                if val_step_outputs[0]['out_aux'] is not None:
+                    keys = val_step_outputs[0]['out_aux'].keys()
+                    for k in keys:
+                        if roi not in k: continue
+                        outs = []
+                        for i, val_step_output in enumerate(val_step_outputs):
+                            out_aux = val_step_output['out_aux']
+                            outs.append(out_aux[k])
+                        outs = torch.cat(outs, 0)
+                        corr = vectorized_correlation(outs, yy).mean().item()
+
+                        self.log(f'aux_lw/{k}', self.aux_loss_weights[k], prog_bar=False, logger=True, sync_dist=True)
+                        self.log(f'val_corr/{k}', corr, logger=True, sync_dist=False)
+        else:
             # Logger.current_logger().report_scalar(
             #     "validation", "correlation", iteration=self.global_step, value=val_corr)
+            def roi_correlation(x, y, roi_lens, roi_names):
+                xx = torch.hsplit(x, roi_lens)[:-1]
+                yy = torch.hsplit(y, roi_lens)[:-1]
 
-            # def roi_correlation(x, y, roi_lens, roi_names):
-            #     xx = torch.hsplit(x, roi_lens)[:-1]
-            #     yy = torch.hsplit(y, roi_lens)[:-1]
-            #
-            #     corrs_dict = {}
-            #     i = 0
-            #     for roi in roi_names:
-            #         a, b = xx[i], yy[i]
-            #         corr = vectorized_correlation(a, b).mean().item()
-            #         corrs_dict[roi] = corr
-            #         i += 1
-            #
-            #     return corrs_dict
+                corrs_dict = {}
+                i = 0
+                for roi in roi_names:
+                    a, b = xx[i], yy[i]
+                    corr = vectorized_correlation(a, b).mean().item()
+                    corrs_dict[roi] = corr
+                    i += 1
 
-            # for roi, corr in roi_correlation(val_outs, val_ys, self.hparams.idx_ends.tolist(),
-            #                                  self.hparams.rois.split(',')).items():
-            #     self.log(f'val_corr/{roi}_final', corr, logger=True, sync_dist=False)
+                return corrs_dict
 
-            # aux heads
-            if val_step_outputs[0]['out_aux'] is not None:
-                keys = val_step_outputs[0]['out_aux'].keys()
-                for k in keys:
-                    if roi not in k: continue
-                    outs = []
-                    for i, val_step_output in enumerate(val_step_outputs):
-                        out_aux = val_step_output['out_aux']
-                        outs.append(out_aux[k])
-                    outs = torch.cat(outs, 0)
-                    corr = vectorized_correlation(outs, yy).mean().item()
-
-                    self.log(f'aux_lw/{k}', self.aux_loss_weights[k], prog_bar=False, logger=True, sync_dist=True)
-                    self.log(f'val_corr/{k}', corr, logger=True, sync_dist=False)
+            val_outs = torch.cat([out['out'][self.hparams.rois] for out in val_step_outputs], 0)
+            for roi, corr in roi_correlation(val_outs, val_ys, self.hparams.idx_ends,
+                                             self.hparams.rois.split(',')).items():
+                self.log(f'val_corr/{roi}_final', corr, logger=True, sync_dist=False)
+                avg_val_corr.append(corr)
 
         avg_val_corr = np.mean(avg_val_corr)
         self.log(f'val_corr/final', avg_val_corr, prog_bar=True, logger=True, sync_dist=False)

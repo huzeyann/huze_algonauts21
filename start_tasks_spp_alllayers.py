@@ -43,7 +43,7 @@ for roi in rois:
                 p_text += '-'.join([str(i) for i in pp])
                 p_text += ','
 
-            tags = [roi, layer, p_text, 'no_freezebn']
+            tags = [roi, layer, p_text, 'detach_aux']
             cloned_task = Task.clone(source_task=template_task,
                                      name=','.join(tags),
                                      parent=template_task.id)
@@ -64,13 +64,13 @@ for roi in rois:
             cloned_task_parameters['Args/layer_hidden'] = 2048
             cloned_task_parameters['Args/debug'] = False
             cloned_task_parameters['Args/freeze_bn'] = True
-            cloned_task_parameters['Args/detach_aux'] = False
+            cloned_task_parameters['Args/detach_aux'] = True
             cloned_task_parameters['Args/separate_rois'] = False
             cloned_task_parameters['Args/early_stop_epochs'] = 5
             cloned_task_parameters['Args/max_epochs'] = 100
             cloned_task_parameters['Args/backbone_freeze_epochs'] = 2
             cloned_task_parameters['Args/reduce_aux_loss_ratio'] = 0.5
-            cloned_task_parameters['Args/reduce_aux_min_delta'] = 0.01
+            cloned_task_parameters['Args/reduce_aux_min_delta'] = 0.000001
             cloned_task_parameters['Args/reduce_aux_patience'] = 4
             cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
             cloned_task_parameters['Args/pooling_mode'] = 'max'

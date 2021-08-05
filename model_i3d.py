@@ -294,7 +294,7 @@ class FcFusion(nn.Module):
         pass
 
     def forward(self, input):
-        assert (isinstance(input, tuple)) or (isinstance(input, dict))
+        assert (isinstance(input, tuple)) or (isinstance(input, dict)) or (isinstance(input, list))
         if isinstance(input, dict):
             input = tuple(input.values())
 
@@ -363,6 +363,9 @@ class ConvFusion(nn.Module):
             self.weight = torch.nn.Parameter(data=torch.rand(num_voxels, num_chs), requires_grad=True)
         elif fusion_type == 'conv':
             self.weight = torch.nn.Parameter(data=torch.rand(num_chs), requires_grad=True)
+        elif fusion_type == 'concat':
+            self.fc = nn.Sequential(nn.ELU(),
+                                    nn.Linear(num_voxels * num_chs, num_voxels))
 
     def init_weights(self):
         pass
@@ -377,6 +380,8 @@ class ConvFusion(nn.Module):
 
         if self.fusion_type == 'concat':
             out = torch.cat(input, -1)
+            out = out.reshape(out.shape[0], -1)
+            out = self.fc(out)
 
         elif self.fusion_type == 'conv' or self.fusion_type == 'conv_voxel':
             out = torch.stack(input, -1)
@@ -417,6 +422,7 @@ class I3d_neck(nn.Module):
         self.pathways = hparams['pathways'].split(',')  # ['topdown', 'bottomup'] aka 'parallel', or "none"
         self.is_pyramid = False if self.pathways[0] == 'none' else True
         self.aux_heads = True if hparams['aux_loss_weight'] > 0 else False
+        self.old_mix = hparams['old_mix']
         if hparams['separate_rois']:
             self.rois = hparams['rois'].split(',')
             self.output_sizes = hparams['roi_lens']
@@ -508,17 +514,30 @@ class I3d_neck(nn.Module):
                     else:
                         NotImplementedError()
 
-                    if not self.hparams['no_convtrans']:
+                    if self.old_mix:
                         self.ch_response.update({k: build_fc(
-                            hparams, self.fc_input_dims[k], output_size)})
+                            hparams, self.fc_input_dims[k], output_size, part='first')})
                     else:
-                        self.ch_response.update(
-                            {k: ConvResponseModel(self.fc_input_dims[k], hparams['num_subs'], hparams)})
+                        if not self.hparams['no_convtrans']:
+                            self.ch_response.update({k: build_fc(
+                                hparams, self.fc_input_dims[k], output_size)})
+                        else:
+                            self.ch_response.update(
+                                {k: ConvResponseModel(self.fc_input_dims[k], hparams['num_subs'], hparams)})
 
-        for roi, output_size in zip(self.rois, self.output_sizes):
-            self.final_fusions.update({f'{roi}': ConvFusion(
-                num_voxels=output_size, num_chs=self.num_chs,
-                fusion_type=hparams['final_fusion'], detach=hparams['detach_aux'])})
+        if self.old_mix:
+            in_size = self.hparams.first_layer_hidden * self.num_chs if hparams['final_fusion'] == 'concat' \
+                else self.hparams.first_layer_hidden
+            for roi, output_size in zip(self.rois, self.output_sizes):
+                self.final_fusions.update({f'{roi}': nn.Sequential(
+                    FcFusion(fusion_type=hparams['final_fusion']),
+                    build_fc(self.hparams, in_size, output_size),
+                )})
+        else:
+            for roi, output_size in zip(self.rois, self.output_sizes):
+                self.final_fusions.update({f'{roi}': ConvFusion(
+                    num_voxels=output_size, num_chs=self.num_chs,
+                    fusion_type=hparams['final_fusion'], detach=hparams['detach_aux'])})
 
     def forward(self, x):
 
@@ -541,6 +560,8 @@ class I3d_neck(nn.Module):
 
         # fmri
         x = {k: self.ch_response[k](v) for k, v in x.items()}
+        # print(self.ch_response)
+        # print(self.final_fusions)
 
         out = {}
         for roi in self.rois:
@@ -552,7 +573,7 @@ class I3d_neck(nn.Module):
             roi_out = self.final_fusions[roi](roi_out_auxs)
             out[roi] = roi_out
 
-        out_aux = x
+        out_aux = None if self.old_mix else x
         # for x_i in self.pyramid_layers:
         #     for pathway in self.pathways:
         #         roi_out_auxs = []
