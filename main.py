@@ -27,7 +27,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts roi-V1 extensive search'
+PROJECT_NAME = 'Algonauts separate layers'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -421,11 +421,18 @@ class LitModel(LightningModule):
         else:
             optimizer = SAM(optimizer_grouped_parameters, AdaBelief, adaptive=True, rho=0.5)
 
-        scheduler = StepLR(optimizer, step_size=self.hparams.backbone_freeze_epochs, gamma=0.5)
+        if self.hparams.step_lr_ratio < 1.0:
+            scheduler = MultiStepLR(optimizer, milestones=self.hparams.step_lr_epochs, gamma=self.hparams.step_lr_ratio)
+            # scheduler = StepLR(optimizer, step_size=self.hparams.backbone_freeze_epochs, gamma=0.5)
+            tuple_of_dicts = (
+                {"optimizer": optimizer, "lr_scheduler": scheduler},
+            )
+        else:
+            tuple_of_dicts = (
+                {"optimizer": optimizer},
+            )
 
-        return (
-            {"optimizer": optimizer, "lr_scheduler": scheduler},
-        )
+        return tuple_of_dicts
 
 
 def train(args):
@@ -591,6 +598,8 @@ if __name__ == '__main__':
     parser.add_argument('--subs', type=str, default="all")
     parser.add_argument('--num_subs', type=int, default=10)
     parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
+    parser.add_argument('--step_lr_epochs', type=int, nargs='+', default=[4, 12])
+    parser.add_argument('--step_lr_ratio', type=float, default=1.0)
     parser.add_argument('--gpus', type=str, default='1')
     parser.add_argument('--val_check_interval', type=float, default=1.0)
     parser.add_argument('--val_ratio', type=float, default=0.1)
