@@ -222,11 +222,12 @@ def start_tasks_no_pooling(rois, layers, freeze_bns, pooling_modes, batch_size=3
                     task_ids.append(cloned_task.id)
 
 
+## Freeze BN part 1
 # 16
 start_tasks_no_pooling(
     rois=['EBA', 'LOC', 'PPA', 'FFA', 'V1', 'V2', 'V3', 'V4'],
     layers=['x3'],
-    freeze_bns=[False, True],
+    freeze_bns=[False],
     pooling_modes=['no'],
     batch_size=24
 )
@@ -235,7 +236,7 @@ start_tasks_no_pooling(
 start_tasks_no_pooling(
     rois=['STS'],
     layers=['x3'],
-    freeze_bns=[False, True],
+    freeze_bns=[False],
     pooling_modes=['no'],
     batch_size=20
 )
@@ -246,12 +247,11 @@ start_tasks_adaptive_pooling(
     layers=['x4'],
     rfs=[1],
     rf_ts=[1],
-    freeze_bns=[False, True],
+    freeze_bns=[False],
     pooling_modes=['adaptive_avg'],
     batch_size=32
 )
 
-## Freeze BN part 1
 # 12
 start_tasks_spp(
     rois=['V1', 'V2', 'V3', 'V4'],
@@ -289,7 +289,7 @@ start_tasks_spp(
         [1, 3, 5],
         [2, 3, 7],
     ],
-    freeze_bns=[True],
+    freeze_bns=[False],
     pooling_modes=['max'],
     batch_size=24
 )
@@ -303,12 +303,42 @@ start_tasks_spp(
         [1, 3, 5],
         [2, 3, 7],
     ],
-    freeze_bns=[True],
+    freeze_bns=[False],
     pooling_modes=['avg'],
     batch_size=24
 )
 
 ## Freeze BN part 2
+
+# 16
+start_tasks_no_pooling(
+    rois=['EBA', 'LOC', 'PPA', 'FFA', 'V1', 'V2', 'V3', 'V4'],
+    layers=['x3'],
+    freeze_bns=[True],
+    pooling_modes=['no'],
+    batch_size=32
+)
+
+# 2
+start_tasks_no_pooling(
+    rois=['STS'],
+    layers=['x3'],
+    freeze_bns=[True],
+    pooling_modes=['no'],
+    batch_size=32
+)
+
+# 18
+start_tasks_adaptive_pooling(
+    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+    layers=['x4'],
+    rfs=[1],
+    rf_ts=[1],
+    freeze_bns=[True],
+    pooling_modes=['adaptive_avg'],
+    batch_size=32
+)
+
 # 12
 start_tasks_spp(
     rois=['V1', 'V2', 'V3', 'V4'],
@@ -320,7 +350,7 @@ start_tasks_spp(
     ],
     freeze_bns=[True],
     pooling_modes=['max'],
-    batch_size=24
+    batch_size=32
 )
 
 # 24
@@ -334,7 +364,7 @@ start_tasks_spp(
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
-    batch_size=24
+    batch_size=32
 )
 
 # 15
@@ -346,9 +376,9 @@ start_tasks_spp(
         [1, 3, 5],
         [2, 3, 7],
     ],
-    freeze_bns=[False],
+    freeze_bns=[True],
     pooling_modes=['max'],
-    batch_size=24
+    batch_size=32
 )
 
 # 30
@@ -360,9 +390,9 @@ start_tasks_spp(
         [1, 3, 5],
         [2, 3, 7],
     ],
-    freeze_bns=[False],
+    freeze_bns=[True],
     pooling_modes=['avg'],
-    batch_size=24
+    batch_size=32
 )
 
 print(task_ids)
