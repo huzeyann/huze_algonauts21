@@ -51,7 +51,7 @@ def vectorized_correlation(x, y):
 
     return corr.ravel()
 
-def hsplit(x, idxs):
+def dokodemo_hsplit(x, idxs):
     ret = []
     for i in range(len(idxs)):
         if i == 0:

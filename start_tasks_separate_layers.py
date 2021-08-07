@@ -222,62 +222,223 @@ def start_tasks_no_pooling(rois, layers, freeze_bns, pooling_modes, batch_size=3
                     task_ids.append(cloned_task.id)
 
 
-## Freeze BN part 1
-# 16
-start_tasks_no_pooling(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x3'],
-    freeze_bns=[False],
-    pooling_modes=['no'],
-    batch_size=24
-)
+# ## Freeze BN part 1
+# # 16
+# start_tasks_no_pooling(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x3'],
+#     freeze_bns=[False],
+#     pooling_modes=['no'],
+#     batch_size=24
+# )
+#
+# # 2
+# start_tasks_no_pooling(
+#     rois=['STS'],
+#     layers=['x3'],
+#     freeze_bns=[False],
+#     pooling_modes=['no'],
+#     batch_size=20
+# )
+#
+# # 18
+# start_tasks_adaptive_pooling(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x4'],
+#     rfs=[1],
+#     rf_ts=[1],
+#     freeze_bns=[False],
+#     pooling_modes=['adaptive_avg'],
+#     batch_size=32
+# )
+#
+# # 12
+# start_tasks_spp(
+#     rois=['V1', 'V2', 'V3', 'V4'],
+#     layers=['x1'],
+#     ps=[
+#         [2, 4, 7],
+#         [3, 6, 9],
+#         [3, 5, 11],
+#     ],
+#     freeze_bns=[False],
+#     pooling_modes=['max'],
+#     batch_size=24
+# )
+#
+# # 24
+# start_tasks_spp(
+#     rois=['V1', 'V2', 'V3', 'V4'],
+#     layers=['x2', 'x3'],
+#     ps=[
+#         [2, 4, 7],
+#         [3, 6, 9],
+#         [3, 5, 11],
+#     ],
+#     freeze_bns=[False],
+#     pooling_modes=['avg'],
+#     batch_size=24
+# )
+#
+# # 15
+# start_tasks_spp(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
+#     layers=['x1'],
+#     ps=[
+#         [1, 2, 3],
+#         [1, 3, 5],
+#         [2, 3, 7],
+#     ],
+#     freeze_bns=[False],
+#     pooling_modes=['max'],
+#     batch_size=24
+# )
+#
+# # 30
+# start_tasks_spp(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
+#     layers=['x2', 'x3'],
+#     ps=[
+#         [1, 2, 3],
+#         [1, 3, 5],
+#         [2, 3, 7],
+#     ],
+#     freeze_bns=[False],
+#     pooling_modes=['avg'],
+#     batch_size=24
+# )
+#
+# ## Freeze BN part 2
+#
+# # 16
+# start_tasks_no_pooling(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x3'],
+#     freeze_bns=[True],
+#     pooling_modes=['no'],
+#     batch_size=32
+# )
+#
+# # 2
+# start_tasks_no_pooling(
+#     rois=['STS'],
+#     layers=['x3'],
+#     freeze_bns=[True],
+#     pooling_modes=['no'],
+#     batch_size=32
+# )
+#
+# # 18
+# start_tasks_adaptive_pooling(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x4'],
+#     rfs=[1],
+#     rf_ts=[1],
+#     freeze_bns=[True],
+#     pooling_modes=['adaptive_avg'],
+#     batch_size=32
+# )
+#
+# # 12
+# start_tasks_spp(
+#     rois=['V1', 'V2', 'V3', 'V4'],
+#     layers=['x1'],
+#     ps=[
+#         [2, 4, 7],
+#         [3, 6, 9],
+#         [3, 5, 11],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['max'],
+#     batch_size=32
+# )
+#
+# # 24
+# start_tasks_spp(
+#     rois=['V1', 'V2', 'V3', 'V4'],
+#     layers=['x2', 'x3'],
+#     ps=[
+#         [2, 4, 7],
+#         [3, 6, 9],
+#         [3, 5, 11],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     batch_size=32
+# )
+#
+# # 15
+# start_tasks_spp(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
+#     layers=['x1'],
+#     ps=[
+#         [1, 2, 3],
+#         [1, 3, 5],
+#         [2, 3, 7],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['max'],
+#     batch_size=32
+# )
+#
+# # 30
+# start_tasks_spp(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
+#     layers=['x2', 'x3'],
+#     ps=[
+#         [1, 2, 3],
+#         [1, 3, 5],
+#         [2, 3, 7],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     batch_size=32
+# )
 
-# 2
+
+## Freeze BN part 1
+# 9
 start_tasks_no_pooling(
-    rois=['STS'],
-    layers=['x3'],
+    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+    layers=['x4'],
     freeze_bns=[False],
     pooling_modes=['no'],
-    batch_size=20
+    batch_size=32
 )
 
 # 18
 start_tasks_adaptive_pooling(
     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
     layers=['x4'],
-    rfs=[1],
+    rfs=[2, 3, 4, 5, 6],
     rf_ts=[1],
     freeze_bns=[False],
     pooling_modes=['adaptive_avg'],
     batch_size=32
 )
 
-# 12
+# 4
 start_tasks_spp(
     rois=['V1', 'V2', 'V3', 'V4'],
     layers=['x1'],
     ps=[
-        [2, 4, 7],
-        [3, 6, 9],
-        [3, 5, 11],
+        [1, 2, 3],
     ],
     freeze_bns=[False],
     pooling_modes=['max'],
-    batch_size=24
+    batch_size=32
 )
 
-# 24
+# 4
 start_tasks_spp(
     rois=['V1', 'V2', 'V3', 'V4'],
     layers=['x2', 'x3'],
     ps=[
-        [2, 4, 7],
-        [3, 6, 9],
-        [3, 5, 11],
+        [1, 2, 3],
     ],
     freeze_bns=[False],
     pooling_modes=['avg'],
-    batch_size=24
+    batch_size=32
 )
 
 # 15
@@ -285,9 +446,9 @@ start_tasks_spp(
     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
     layers=['x1'],
     ps=[
-        [1, 2, 3],
-        [1, 3, 5],
-        [2, 3, 7],
+        [2, 4, 7],
+        [3, 6, 9],
+        [5, 7, 11],
     ],
     freeze_bns=[False],
     pooling_modes=['max'],
@@ -299,9 +460,9 @@ start_tasks_spp(
     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
     layers=['x2', 'x3'],
     ps=[
-        [1, 2, 3],
-        [1, 3, 5],
-        [2, 3, 7],
+        [2, 4, 7],
+        [3, 6, 9],
+        [5, 7, 11],
     ],
     freeze_bns=[False],
     pooling_modes=['avg'],
@@ -310,19 +471,10 @@ start_tasks_spp(
 
 ## Freeze BN part 2
 
-# 16
+# 9
 start_tasks_no_pooling(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x3'],
-    freeze_bns=[True],
-    pooling_modes=['no'],
-    batch_size=32
-)
-
-# 2
-start_tasks_no_pooling(
-    rois=['STS'],
-    layers=['x3'],
+    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+    layers=['x4'],
     freeze_bns=[True],
     pooling_modes=['no'],
     batch_size=32
@@ -332,35 +484,31 @@ start_tasks_no_pooling(
 start_tasks_adaptive_pooling(
     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
     layers=['x4'],
-    rfs=[1],
+    rfs=[2, 3, 4, 5, 6],
     rf_ts=[1],
     freeze_bns=[True],
     pooling_modes=['adaptive_avg'],
     batch_size=32
 )
 
-# 12
+# 4
 start_tasks_spp(
     rois=['V1', 'V2', 'V3', 'V4'],
     layers=['x1'],
     ps=[
-        [2, 4, 7],
-        [3, 6, 9],
-        [3, 5, 11],
+        [1, 2, 3],
     ],
     freeze_bns=[True],
     pooling_modes=['max'],
     batch_size=32
 )
 
-# 24
+# 4
 start_tasks_spp(
     rois=['V1', 'V2', 'V3', 'V4'],
     layers=['x2', 'x3'],
     ps=[
-        [2, 4, 7],
-        [3, 6, 9],
-        [3, 5, 11],
+        [1, 2, 3],
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
@@ -372,13 +520,13 @@ start_tasks_spp(
     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
     layers=['x1'],
     ps=[
-        [1, 2, 3],
-        [1, 3, 5],
-        [2, 3, 7],
+        [2, 4, 7],
+        [3, 6, 9],
+        [5, 7, 11],
     ],
     freeze_bns=[True],
     pooling_modes=['max'],
-    batch_size=32
+    batch_size=24
 )
 
 # 30
@@ -386,13 +534,14 @@ start_tasks_spp(
     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
     layers=['x2', 'x3'],
     ps=[
-        [1, 2, 3],
-        [1, 3, 5],
-        [2, 3, 7],
+        [2, 4, 7],
+        [3, 6, 9],
+        [5, 7, 11],
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
-    batch_size=32
+    batch_size=24
 )
+
 
 print(task_ids)

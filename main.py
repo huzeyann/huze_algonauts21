@@ -27,7 +27,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts separate layers'
+PROJECT_NAME = 'Algonauts separate layers flow'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -222,7 +222,7 @@ class LitModel(LightningModule):
 
             loss_all = 0
             if self.hparams.separate_rois:
-                for roi, yy in zip(self.rois, torch.hsplit(y, self.hparams.idx_ends)):
+                for roi, yy in zip(self.rois, dokodemo_hsplit(y, self.hparams.idx_ends)):
 
                     loss = F.mse_loss(out[roi], yy)
                     if is_log:
@@ -342,7 +342,7 @@ class LitModel(LightningModule):
         val_ys = torch.cat([out['y'] for out in val_step_outputs], 0)
         avg_val_corr = []
         if self.hparams.separate_rois:
-            for roi, yy in zip(self.rois, torch.hsplit(val_ys, self.hparams.idx_ends)):
+            for roi, yy in zip(self.rois, dokodemo_hsplit(val_ys, self.hparams.idx_ends)):
                 val_outs = torch.cat([out['out'][roi] for out in val_step_outputs], 0)
                 val_corr = vectorized_correlation(val_outs, yy).mean().item()
                 avg_val_corr.append(val_corr)
@@ -367,8 +367,8 @@ class LitModel(LightningModule):
             # Logger.current_logger().report_scalar(
             #     "validation", "correlation", iteration=self.global_step, value=val_corr)
             def roi_correlation(x, y, roi_lens, roi_names):
-                xx = torch.hsplit(x, roi_lens)[:-1]
-                yy = torch.hsplit(y, roi_lens)[:-1]
+                xx = dokodemo_hsplit(x, roi_lens)
+                yy = dokodemo_hsplit(y, roi_lens)
 
                 corrs_dict = {}
                 i = 0
@@ -452,14 +452,7 @@ def train(args):
                              load_from_np=args.load_from_np)
     dm.setup('fit')
 
-    checkpoint_callback = ModelCheckpoint(
-        monitor='val_corr/final',
-        dirpath=f'/home/huze/.cache/checkpoints/{task.id}',
-        filename='{epoch:02d}-{val_corr/final:.6f}',
-        save_weights_only=True,
-        save_top_k=1,
-        mode='max',
-    )
+    callbacks = []
 
     early_stop_callback = EarlyStopping(
         monitor='val_corr/final',
@@ -468,12 +461,13 @@ def train(args):
         verbose=False,
         mode='max'
     )
+    callbacks.append(early_stop_callback)
 
-    finetune_callback = BackboneFinetuning(
-        args.backbone_freeze_epochs if not args.debug else 1
-    )
-
-    callbacks = [early_stop_callback, finetune_callback]
+    if args.backbone_freeze_epochs > 0:
+        finetune_callback = BackboneFinetuning(
+            args.backbone_freeze_epochs if not args.debug else 1
+        )
+        callbacks.append(finetune_callback)
 
     rois = args.rois.split(',') if args.separate_rois else [args.rois]
     if args.reduce_aux_loss_ratio >= 0:
@@ -494,13 +488,21 @@ def train(args):
                     callbacks.append(callback)
 
     if args.save_checkpoints:
+        checkpoint_callback = ModelCheckpoint(
+            monitor='val_corr/final',
+            dirpath=os.path.join(args.checkpoints_dir, task.id),
+            filename='{epoch:02d}-{val_corr/final:.6f}',
+            save_weights_only=True,
+            save_top_k=1,
+            mode='max',
+        )
         callbacks.append(checkpoint_callback)
 
     if args.debug:
         torch.set_printoptions(10)
 
     if args.backbone_type == 'i3d_rgb':
-        backbone = modify_resnets_patrial_x_all(multi_resnet3d50(cache_dir=args.cache_dir))
+        backbone = modify_resnets_patrial_x_all(multi_resnet3d50(cache_dir=args.i3d_rgb_dir))
     elif args.backbone_type == 'bdcn_edge':
         backbone = load_bdcn(args.bdcn_path)
     elif args.backbone_type == 'i3d_flow':
@@ -509,8 +511,8 @@ def train(args):
     else:
         NotImplementedError()
 
-    tb_logger = pl_loggers.TensorBoardLogger(f'/data_smr/huze/projects/my_algonauts/lightning_logs/{task.id}/')
-    csv_logger = pl_loggers.CSVLogger(f'/data_smr/huze/projects/my_algonauts/csv_logs/{task.id}/')
+    tb_logger = pl_loggers.TensorBoardLogger(os.path.join(args.logs_dir, 'lightning_logs', task.id))
+    csv_logger = pl_loggers.CSVLogger(os.path.join(args.logs_dir, 'csv_logs', task.id))
     loggers = [tb_logger, csv_logger]
 
     trainer = pl.Trainer(
@@ -549,22 +551,6 @@ def train(args):
 
     dm.teardown()
 
-    if args.save_csv:
-        file = '/data_smr/huze/projects/my_algonauts/dirtycsv.csv'
-        res = {
-            'roi': args.rois,
-            'layer': args.pyramid_layers,
-            'pool_rf': hparams[f'pooling_size_{args.pyramid_layers}'],
-            'objective_value': early_stop_callback.best_score.item(),
-            'objective_iteration': plmodel.global_step,
-        }
-        if not os.path.exists(file):
-            df = pd.DataFrame()
-        else:
-            df = pd.read_csv(file)
-        df = df.append(res, ignore_index=True)
-        df.to_csv(file)
-
     if args.save_checkpoints:
         dm.setup('test')
         plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
@@ -589,7 +575,7 @@ if __name__ == '__main__':
     parser.add_argument('--bdcn_path', type=str,
                         default='/home/huze/my_algonauts/bdcn-final-model/bdcn_pretrained_on_bsds500.pth')
     parser.add_argument('--i3d_flow_path', type=str,
-                        default='/home/huze/my_algonauts/i3d-flow-model/i3d_flow.pt')
+                        default='/data_smr/huze/projects/my_algonauts/video_features/models/i3d/checkpoints/i3d_flow.pt')
     parser.add_argument('--additional_features', type=str, default='')
     parser.add_argument('--additional_features_dir', type=str, default='/data_smr/huze/projects/my_algonauts/features/')
     parser.add_argument('--track', type=str, default='mini_track')
@@ -597,7 +583,7 @@ if __name__ == '__main__':
     parser.add_argument('--rois', type=str, default="EBA")
     parser.add_argument('--subs', type=str, default="all")
     parser.add_argument('--num_subs', type=int, default=10)
-    parser.add_argument('--backbone_freeze_epochs', type=int, default=100)
+    parser.add_argument('--backbone_freeze_epochs', type=int, default=0)
     parser.add_argument('--step_lr_epochs', type=int, nargs='+', default=[4, 12])
     parser.add_argument('--step_lr_ratio', type=float, default=1.0)
     parser.add_argument('--gpus', type=str, default='1')
@@ -615,8 +601,9 @@ if __name__ == '__main__':
     parser.add_argument("--asm", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
-    parser.add_argument('--cache_dir', type=str, default='/home/huze/.cache/')
-    parser.add_argument('--save_csv', default=False, action="store_true")
+    parser.add_argument('--checkpoints_dir', type=str, default='/home/huze/checkpoints/')
+    parser.add_argument('--logs_dir', type=str, default='/data_smr/huze/projects/my_algonauts/')
+    parser.add_argument('--i3d_rgb_dir', type=str, default='/home/huze/.cache/')
 
     parser = LitModel.add_model_specific_args(parser)
     args = parser.parse_args()

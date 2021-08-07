@@ -465,7 +465,10 @@ class I3d_neck(nn.Module):
                     if x_i == 'x5':  # i3d_flow
                         self.first_convs.update({k: nn.Flatten()})
                         self.poolings.update({k: nn.Flatten()})
-                        self.ch_response.update({k: build_fc(hparams, 1024, output_size)})
+                        if self.old_mix:
+                            self.ch_response.update({k: build_fc(hparams, 1024, output_size, part='first')})
+                        else:
+                            self.ch_response.update({k: build_fc(hparams, 1024, output_size)})
                         # print(self.ch_response)
                         continue
 
