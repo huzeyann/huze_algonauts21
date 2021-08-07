@@ -177,7 +177,7 @@ class BDCN(nn.Module):
 
         fuse = self.fuse(torch.cat([p1_1, p2_1, p3_1, p4_1, p5_1, p1_2, p2_2, p3_2, p4_2, p5_2], 1))
 
-        return [p1_1, p2_1, p3_1, p4_1, p5_1, p1_2, p2_2, p3_2, p4_2, p5_2, fuse]
+        return fuse
 
     def _initialize_weights(self, logger=None):
         for name, param in self.state_dict().items():

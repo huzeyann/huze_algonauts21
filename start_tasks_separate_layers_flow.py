@@ -14,9 +14,9 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
 available_devices = {
-    '57': [4, 5, 6, 7],
-    '58': [0],
-    '59': [0, 2],
+    # '57': [4, 5, 6, 7],
+    '58': [1, 4, 5],
+    # '59': [0, 2],
 }
 
 queue_names = []
@@ -81,6 +81,7 @@ def start_tasks_spp(rois, layers, ps, pts, freeze_bns, pooling_modes, batch_size
                             cloned_task_parameters['Args/val_check_interval'] = 1.0
                             cloned_task_parameters['Args/val_ratio'] = 0.1
                             cloned_task_parameters['Args/save_checkpoints'] = True
+                            cloned_task_parameters['Args/checkpoints_dir'] = '/data/huze/checkpoints/'
                             cloned_task_parameters[
                                 'Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
 
@@ -145,6 +146,7 @@ def start_tasks_adaptive_pooling(rois, layers, rfs, rf_ts, freeze_bns, pooling_m
                             cloned_task_parameters['Args/val_check_interval'] = 1.0
                             cloned_task_parameters['Args/val_ratio'] = 0.1
                             cloned_task_parameters['Args/save_checkpoints'] = True
+                            cloned_task_parameters['Args/checkpoints_dir'] = '/data/huze/checkpoints/'
                             cloned_task_parameters[
                                 'Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
 
@@ -204,6 +206,7 @@ def start_tasks_no_pooling(rois, layers, freeze_bns, pooling_modes, batch_size=3
                     cloned_task_parameters['Args/val_check_interval'] = 1.0
                     cloned_task_parameters['Args/val_ratio'] = 0.1
                     cloned_task_parameters['Args/save_checkpoints'] = True
+                    cloned_task_parameters['Args/checkpoints_dir'] = '/data/huze/checkpoints/'
                     cloned_task_parameters[
                         'Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
 
@@ -260,6 +263,7 @@ def start_tasks_x5(rois, layers, freeze_bns, batch_size=32, conv_size=1024):
                 cloned_task_parameters['Args/val_check_interval'] = 1.0
                 cloned_task_parameters['Args/val_ratio'] = 0.1
                 cloned_task_parameters['Args/save_checkpoints'] = True
+                cloned_task_parameters['Args/checkpoints_dir'] = '/data/huze/checkpoints/'
                 cloned_task_parameters[
                     'Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
 
@@ -273,50 +277,50 @@ def start_tasks_x5(rois, layers, freeze_bns, batch_size=32, conv_size=1024):
                 task_ids.append(cloned_task.id)
 
 
-# 9
-start_tasks_x5(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x5'],
-    freeze_bns=[True],
-    batch_size=32,
-    conv_size=1024,
-)
-
-# 63
-start_tasks_adaptive_pooling(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x2'],
-    rfs=[1, 2, 3, 4, 5, 6, 7],
-    rf_ts=[1],
-    freeze_bns=[True],
-    pooling_modes=['adaptive_avg'],
-    batch_size=32,
-    conv_size=256,
-)
-
-# 126
-start_tasks_adaptive_pooling(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x3', 'x4'],
-    rfs=[1, 2, 3, 4, 5, 6, 7],
-    rf_ts=[1],
-    freeze_bns=[True],
-    pooling_modes=['adaptive_avg'],
-    batch_size=32,
-    conv_size=512,
-)
-
-# 63
-start_tasks_adaptive_pooling(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x1'],
-    rfs=[1, 2, 3, 4, 5, 6, 7],
-    rf_ts=[1],
-    freeze_bns=[True],
-    pooling_modes=['adaptive_max'],
-    batch_size=32,
-    conv_size=192,
-)
+# # 9
+# start_tasks_x5(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x5'],
+#     freeze_bns=[True],
+#     batch_size=32,
+#     conv_size=1024,
+# )
+#
+# # 63
+# start_tasks_adaptive_pooling(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x2'],
+#     rfs=[1, 2, 3, 4, 5, 6, 7],
+#     rf_ts=[1],
+#     freeze_bns=[True],
+#     pooling_modes=['adaptive_avg'],
+#     batch_size=32,
+#     conv_size=256,
+# )
+#
+# # 126
+# start_tasks_adaptive_pooling(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x3', 'x4'],
+#     rfs=[1, 2, 3, 4, 5, 6, 7],
+#     rf_ts=[1],
+#     freeze_bns=[True],
+#     pooling_modes=['adaptive_avg'],
+#     batch_size=32,
+#     conv_size=512,
+# )
+#
+# # 63
+# start_tasks_adaptive_pooling(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x1'],
+#     rfs=[1, 2, 3, 4, 5, 6, 7],
+#     rf_ts=[1],
+#     freeze_bns=[True],
+#     pooling_modes=['adaptive_max'],
+#     batch_size=32,
+#     conv_size=192,
+# )
 
 # 45
 start_tasks_spp(
@@ -358,22 +362,23 @@ start_tasks_spp(
     conv_size=64,
 )
 
-# 54
-start_tasks_spp(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x3', 'x4'],
-    ps=[
-        [1, 2, 3],
-        [2, 3, 5],
-        [3, 5, 7],
-    ],
-    pts=[
-        [1, 1, 1],
-    ],
-    freeze_bns=[True],
-    pooling_modes=['avg'],
-    batch_size=32,
-    conv_size=64,
-)
+# # 72
+# start_tasks_spp(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x3', 'x4'],
+#     ps=[
+#         [1, 2, 3],
+#         [2, 3, 5],
+#         [3, 5, 7],
+#         [5, 6, 7],
+#     ],
+#     pts=[
+#         [1, 1, 1],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     batch_size=32,
+#     conv_size=64,
+# )
 
 print(task_ids)

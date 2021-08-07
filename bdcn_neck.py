@@ -8,16 +8,13 @@ import torch.nn.functional as F
 from torchvision import transforms
 
 from model_i3d import build_fc
-from pyramidpooling import SpatialPyramidPooling
+from pyramidpooling3d import SpatialPyramidPooling3D
 
 
 class BDCNNeck(nn.Module):
     def __init__(self, hparams):
         super(BDCNNeck, self).__init__()
         self.hparams = hparams
-        self.bdcn_outputs = [int(i) for i in self.hparams.bdcn_outputs.split(',')]
-        self.num_bdcns = len(self.bdcn_outputs)
-        assert self.num_bdcns == 1
 
         self.pool_size = self.hparams.bdcn_pool_size
         self.fc_in_dim = int(self.pool_size ** 2 * 1 * self.hparams.video_frames)
@@ -33,7 +30,7 @@ class BDCNNeck(nn.Module):
             NotImplementedError()
 
         self.read_out_layers = nn.Sequential(
-            nn.Sigmoid(),
+            # nn.Sigmoid(),
             pool,
         )
 
@@ -44,7 +41,6 @@ class BDCNNeck(nn.Module):
 
     def forward(self, x):
         # x: (None, D, H, W)
-        x = x[self.bdcn_outputs[0]]
         x = self.read_out_layers(x)
         x = x.reshape(x.shape[0], x.shape[1], -1)
         x = self.lstm(x)[0]

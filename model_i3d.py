@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torchvision.models as models
 from torchvision import transforms
 
-from pyramidpooling import SpatialPyramidPooling
+from pyramidpooling3d import SpatialPyramidPooling3D
 
 
 def conv3x3x3(in_planes, out_planes, stride=1):
@@ -210,7 +210,7 @@ class MiniFC(nn.Module):
                     levels = np.array([[1, 1, 1], [1, 2, 3], [1, 2, 3]])
                 elif hparams['backbone_type'] == 'x2':
                     levels = np.array([[1, 2, 4], [1, 2, 4], [1, 2, 4]])
-                self.pyramidpool = SpatialPyramidPooling(levels, hparams['pooling_mode'])
+                self.pyramidpool = SpatialPyramidPooling3D(levels, hparams['pooling_mode'])
                 input_dim = hparams['conv_size'] * np.sum(levels[0] * levels[1] * levels[2])
 
         self.fc = build_fc(hparams, input_dim, hparams['output_size'])
@@ -494,8 +494,8 @@ class I3d_neck(nn.Module):
                         self.fc_input_dims.update({k: self.planes})
                     elif self.pooling_modes[x_i] == 'spp':
                         self.poolings.update({k: nn.Sequential(
-                            SpatialPyramidPooling(self.spp_level_dict[x_i],
-                                                  hparams['pooling_mode']),
+                            SpatialPyramidPooling3D(self.spp_level_dict[x_i],
+                                                    hparams['pooling_mode']),
                             nn.Flatten())})
                         self.fc_input_dims.update({k: np.sum(
                             self.spp_level_dict[x_i][0] * self.spp_level_dict[x_i][1] * self.spp_level_dict[x_i][

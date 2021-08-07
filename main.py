@@ -16,13 +16,13 @@ from torch.optim.lr_scheduler import MultiStepLR, StepLR
 from callbacks import ReduceAuxLossWeight
 
 from bdcn import load_bdcn
-from bdcn_edge import BDCNNeck
+from bdcn_neck import BDCNNeck
 from dataloading import AlgonautsDataModule
 from i3d_flow import load_i3d_flow
 from model_i3d import *
 from sam import SAM
 from utils import *
-from pyramidpooling import *
+from pyramidpooling3d import *
 import pandas as pd
 
 from clearml import Task, Logger
@@ -134,7 +134,11 @@ class LitModel(LightningModule):
         parser.add_argument('--learning_rate', type=float, default=3e-4)
         parser.add_argument('--backbone_lr_ratio', type=float, default=0.1)
         parser.add_argument('--pooling_mode', type=str, default='avg')
+        parser.add_argument('--spp', default=False, action="store_true")
         parser.add_argument('--pooling_size', type=int, default=5)
+        parser.add_argument('--pooling_size_t', type=int, default=1)
+        parser.add_argument('--spp_size', type=int, nargs='+', help='SPP')
+        parser.add_argument('--spp_size_t', type=int, nargs='+', help='SPP')
         parser.add_argument('--x1_pooling_mode', type=str, default='spp')
         parser.add_argument('--x2_pooling_mode', type=str, default='spp')
         parser.add_argument('--x3_pooling_mode', type=str, default='spp')
@@ -203,7 +207,7 @@ class LitModel(LightningModule):
 
             if self.hparams.backbone_type == 'bdcn_edge':
                 # img to vid
-                out_vid = [x.reshape(s[0], s[1], s[3], s[4]) for x in out_vid]
+                out_vid = out_vid.reshape(s[0], s[1], s[3], s[4])
                 if self.training == False:
                     self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]),
                                                      global_step=self.global_step, dataformats='HW')
@@ -211,7 +215,6 @@ class LitModel(LightningModule):
         else:
             out_vid = x
 
-        # out = self.neck(out_vid, x_add)
         out = self.neck(out_vid)
         return out
 
