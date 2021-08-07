@@ -14,9 +14,9 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
 available_devices = {
-    # '57': [4, 5, 6, 7],
-    '58': [1, 4, 5],
-    # '59': [0, 2],
+    '57': [4, 5, 7],
+    '58': [3, 4, 5, 6, 7],
+    '59': [3, 4, 5, 6, 7],
 }
 
 queue_names = []
@@ -322,45 +322,45 @@ def start_tasks_x5(rois, layers, freeze_bns, batch_size=32, conv_size=1024):
 #     conv_size=192,
 # )
 
-# 45
-start_tasks_spp(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x1'],
-    ps=[
-        [1, 2, 3],
-        [2, 3, 5],
-        [3, 5, 7],
-        [4, 6, 9],
-        [5, 7, 11],
-    ],
-    pts=[
-        [1, 1, 1],
-    ],
-    freeze_bns=[True],
-    pooling_modes=['max'],
-    batch_size=32,
-    conv_size=64,
-)
-
-# 45
-start_tasks_spp(
-    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-    layers=['x2'],
-    ps=[
-        [1, 2, 3],
-        [2, 3, 5],
-        [3, 5, 7],
-        [4, 6, 9],
-        [5, 7, 11],
-    ],
-    pts=[
-        [1, 1, 1],
-    ],
-    freeze_bns=[True],
-    pooling_modes=['avg'],
-    batch_size=32,
-    conv_size=64,
-)
+# # 45
+# start_tasks_spp(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x1'],
+#     ps=[
+#         [1, 2, 3],
+#         [2, 3, 5],
+#         [3, 5, 7],
+#         [4, 6, 9],
+#         [5, 7, 11],
+#     ],
+#     pts=[
+#         [1, 1, 1],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['max'],
+#     batch_size=32,
+#     conv_size=64,
+# )
+#
+# # 45
+# start_tasks_spp(
+#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
+#     layers=['x2'],
+#     ps=[
+#         [1, 2, 3],
+#         [2, 3, 5],
+#         [3, 5, 7],
+#         [4, 6, 9],
+#         [5, 7, 11],
+#     ],
+#     pts=[
+#         [1, 1, 1],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     batch_size=32,
+#     conv_size=64,
+# )
 
 # # 72
 # start_tasks_spp(

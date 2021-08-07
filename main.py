@@ -27,7 +27,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts separate layers flow'
+PROJECT_NAME = 'Algonauts separate layers edge'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -162,8 +162,6 @@ class LitModel(LightningModule):
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--final_fusion', type=str, default='conv')
         parser.add_argument('--old_mix', default=False, action="store_true")
-        parser.add_argument('--bdcn_outputs', type=str, default='-1')
-        parser.add_argument('--bdcn_pool_size', type=int, default=1)
         parser.add_argument('--lstm_layers', type=int, default=1)
         parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.0)
@@ -209,8 +207,8 @@ class LitModel(LightningModule):
                 # img to vid
                 out_vid = out_vid.reshape(s[0], s[1], s[3], s[4])
                 if self.training == False:
-                    self.logger.experiment.add_image('edges', F.sigmoid(out_vid[-1][0, -1, :, :]),
-                                                     global_step=self.global_step, dataformats='HW')
+                    self.logger.experiment[0].add_image('edges', F.sigmoid(out_vid[0, -1, :, :]),
+                                                        global_step=self.global_step, dataformats='HW')
                     # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
         else:
             out_vid = x
@@ -559,9 +557,15 @@ def train(args):
         plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
                                                 hparams=hparams)
         predictions = trainer.predict(plmodel, datamodule=dm)
-        for roi in rois:
+        for roi in rois:  # roi maybe multiple
             prediction = torch.cat([p[0][roi] for p in predictions], 0)
-            torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
+            if (not hparams['separate_rois']) and (len(hparams['rois'].split(',')) > 1):
+                for rroi, pred in zip(hparams['rois'].split(','),
+                                      dokodemo_hsplit(prediction, hparams['idx_ends'])):  # roi is single
+                    # print(pred.shape)
+                    torch.save(pred, os.path.join(prediction_dir, f'{rroi}.pt'))
+            else:
+                torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
         os.remove(checkpoint_callback.best_model_path)
 
 
@@ -576,7 +580,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
     parser.add_argument('--bdcn_path', type=str,
-                        default='/home/huze/my_algonauts/bdcn-final-model/bdcn_pretrained_on_bsds500.pth')
+                        default='/home/huze/algonauts_datasets/models/bdcn_pretrained_on_bsds500.pth')
     parser.add_argument('--i3d_flow_path', type=str,
                         default='/data_smr/huze/projects/my_algonauts/video_features/models/i3d/checkpoints/i3d_flow.pt')
     parser.add_argument('--additional_features', type=str, default='')
