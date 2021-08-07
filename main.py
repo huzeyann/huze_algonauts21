@@ -558,7 +558,7 @@ def train(args):
                                                 hparams=hparams)
         predictions = trainer.predict(plmodel, datamodule=dm)
         for roi in rois:  # roi maybe multiple
-            prediction = torch.cat([p[0][roi] for p in predictions], 0)
+            prediction = torch.cat([p[0][roi] for p in predictions], 0).cpu()
             if (not hparams['separate_rois']) and (len(hparams['rois'].split(',')) > 1):
                 for rroi, pred in zip(hparams['rois'].split(','),
                                       dokodemo_hsplit(prediction, hparams['idx_ends'])):  # roi is single

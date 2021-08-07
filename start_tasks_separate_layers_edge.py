@@ -15,8 +15,8 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
 
 available_devices = {
     '57': [4, 5, 6, 7],
-    '58': [4, 5, 6, 7],
-    '59': [4, 5, 6, 7],
+    '58': [3, 4, 5, 6, 7],
+    '59': [0, 2],
 }
 
 queue_names = []
