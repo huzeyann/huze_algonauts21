@@ -151,6 +151,7 @@ class PyramidPooling2D(nn.Module):
                                             which is the concentration of multi-level pooling
         """
         num_sample = previous_conv.size(0)
+        num_filters = previous_conv.size(1)
         previous_conv_size = [int(previous_conv.size(2)), int(previous_conv.size(3))]
         for i in range(len(levels)):
             h_kernel = int(math.ceil(previous_conv_size[0] / levels[i]))
@@ -172,9 +173,9 @@ class PyramidPooling2D(nn.Module):
                 raise RuntimeError("Unknown pooling type: %s, please use \"max\" or \"avg\".")
             x = pool(padded_input)
             if i == 0:
-                spp = x.view(num_sample, -1)
+                spp = x.view(num_sample, num_filters, -1)
             else:
-                spp = torch.cat((spp, x.view(num_sample, -1)), 1)
+                spp = torch.cat((spp, x.view(num_sample, num_filters, -1)), -1)
 
         return spp
 

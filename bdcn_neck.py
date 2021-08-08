@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 
-from model_i3d import build_fc
+from model_i3d import build_fc, ConvResponseModel
 from pyramidpooling3d import SpatialPyramidPooling3D, SpatialPyramidPooling2D
 
 
@@ -21,12 +21,12 @@ class BDCNNeck(nn.Module):
         self.pool_size = self.hparams.pooling_size
 
         if self.hparams.spp:
-            levels = np.array([hparams['spp_size'], hparams['spp_size']])
-            self.pooling = SpatialPyramidPooling2D(
+            levels = np.array(hparams['spp_size'])
+            pool = SpatialPyramidPooling2D(
                 levels=levels,
                 mode=hparams['pooling_mode']
             )
-            in_dim = np.sum(levels[0] * levels[1]) * self.planes
+            in_dim = np.sum(levels ** 2) * 1
         else:
             if self.hparams.pooling_mode == 'max':
                 # pool = nn.MaxPool2d(kernel_size=self.pool_size, stride=self.pool_size)
@@ -45,8 +45,16 @@ class BDCNNeck(nn.Module):
 
         self.lstm = nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
                             num_layers=self.hparams.lstm_layers, batch_first=True)
-
-        self.fc = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames, hparams['output_size'])
+        if self.hparams['track'] == 'full_track':
+            if self.hparams['no_convtrans']:
+                self.head = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames,
+                                     hparams['output_size'])
+            else:
+                self.head = ConvResponseModel(self.hparams.layer_hidden * self.hparams.video_frames,
+                                              hparams['num_subs'], hparams)
+        else:
+            self.head = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames,
+                               hparams['output_size'])
 
     def forward(self, x):
         # x: (None, D, H, W)
@@ -54,7 +62,7 @@ class BDCNNeck(nn.Module):
         x = x.reshape(x.shape[0], x.shape[1], -1)
         x = self.lstm(x)[0]
         # print(x.shape)
-        out = self.fc(x.reshape(x.shape[0], -1))
+        out = self.head(x.reshape(x.shape[0], -1))
         out_aux = None
         out = {self.rois: out}
         return out, out_aux

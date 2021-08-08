@@ -1,3 +1,4 @@
+import json
 from argparse import ArgumentParser
 from typing import Any, Optional
 
@@ -27,7 +28,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts separate layers edge'
+PROJECT_NAME = 'Algonauts full_track model zoo'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -68,7 +69,7 @@ class LitModel(LightningModule):
 
     def __init__(self, backbone, hparams: dict, *args, **kwargs):
         super(LitModel, self).__init__()
-        self.save_hyperparameters(hparams)
+        self.save_hyperparameters(hparams, ignore='voxel_idxs')
         # self.hparams = hparams
         self.lr = self.hparams.learning_rate
         self.rois = [self.hparams.rois] if not self.hparams.separate_rois else self.hparams.rois.split(',')
@@ -102,16 +103,17 @@ class LitModel(LightningModule):
             subs = [f'sub{i + 1:02d}' for i in range(10)] if self.hparams.subs == 'all' else self.hparams.subs
             voxel_masks = []
             for sub in subs:
-                voxel_mask = np.load(os.path.join(hparams['datasets_dir'], 'fmris', f'{sub}_voxel_mask.npy'))
+                voxel_mask = np.load(os.path.join(hparams['datasets_dir'], 'fmris-full', f'{sub}_voxel_mask.npy'))
                 voxel_mask = torch.tensor(voxel_mask, device=self.device)
                 voxel_mask = F.pad(voxel_mask, (4, 4, 1, 1, 0, 1))
                 voxel_masks.append(voxel_mask)
-            print('voxel_mask in ', self.device)
             self.voxel_masks = torch.stack(voxel_masks, 0)
+            if kwargs['voxel_idxs'] is not None:
+                self.voxel_idxs = kwargs['voxel_idxs']
+            else:
+                self.voxel_idxs = None
 
         # aux reduction
-        l = len(self.hparams.pyramid_layers.split(',')) * len(self.hparams.pathways.split(','))
-
         self.aux_loss_weights = {}
         for roi in self.rois:
             for x_i in self.hparams.pyramid_layers.split(','):
@@ -214,6 +216,19 @@ class LitModel(LightningModule):
             out_vid = x
 
         out = self.neck(out_vid)
+
+        if self.hparams.track == 'full_track':
+            out, out_aux = out
+            assert out_aux is None
+            out = out['WB']
+            if not self.hparams.no_convtrans:
+                out_voxels = out[self.voxel_masks.unsqueeze(0).expand(out.size()) == 1].reshape(out.shape[0], -1)
+                out_voxels = out_voxels[:, self.voxel_idxs] if self.voxel_idxs is not None else out_voxels
+            else:
+                out_voxels = out
+            out = {'WB': out_voxels}
+            out = (out, out_aux)
+
         return out
 
     def _shared_train_val(self, batch, batch_idx, prefix, is_log=True):
@@ -268,14 +283,9 @@ class LitModel(LightningModule):
 
             return out, loss_all, out_aux
 
-
-
         elif self.hparams.track == 'full_track':
-            out = self(x)
-            if not self.hparams.no_convtrans:
-                out_voxels = out[self.voxel_masks.unsqueeze(0).expand(out.size()) == 1].reshape(out.shape[0], -1)
-            else:
-                out_voxels = out
+            out, out_aux = self(x)
+            out_voxels = out['WB']
             if self.hparams.sample_voxels:
                 mask = torch.rand(out_voxels.shape[1]).unsqueeze(0).expand(out_voxels.size())
                 th = self.hparams.sample_num_voxels / mask.shape[1]
@@ -287,7 +297,7 @@ class LitModel(LightningModule):
             if is_log:
                 self.log(f'{prefix}_mse_loss/final', loss,
                          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=False)
-            return out_voxels, loss, None
+            return out, loss, out_aux
 
     def training_step(self, batch, batch_idx):
         # print(self.neck.first_fcs['none_x3'][0].weight[0, 0])
@@ -436,8 +446,10 @@ class LitModel(LightningModule):
         return tuple_of_dicts
 
 
-def train(args):
+def train(args, voxel_idxs=None, level: str = ''):
     hparams = vars(args)
+    # if voxel_idxs is not None:
+    #     assert args.track == 'full_track' and args.rois == 'WB' and len(level) > 0 and args.save_checkpoints
 
     if args.backbone_type == 'i3d_flow':
         assert args.load_from_np
@@ -450,8 +462,9 @@ def train(args):
                              additional_features_dir=args.additional_features_dir,
                              additional_features=args.additional_features,
                              preprocessing_type=args.preprocessing_type,
-                             load_from_np=args.load_from_np)
-    dm.setup('fit')
+                             load_from_np=args.load_from_np,
+                             voxel_idxs=voxel_idxs)
+    dm.setup()
 
     callbacks = []
 
@@ -546,30 +559,52 @@ def train(args):
         if not os.path.exists(prediction_dir):
             os.system(f'mkdir {prediction_dir}')
 
-    plmodel = LitModel(backbone, hparams)
+    plmodel = LitModel(backbone, hparams, voxel_idxs=voxel_idxs)
 
     trainer.fit(plmodel, datamodule=dm)
 
-    dm.teardown()
+    # dm.teardown()
 
     if args.save_checkpoints:
-        dm.setup('test')
+        # dm.setup('test')
         plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
-                                                hparams=hparams)
+                                                hparams=hparams, voxel_idxs=voxel_idxs)
         predictions = trainer.predict(plmodel, datamodule=dm)
+        os.remove(checkpoint_callback.best_model_path)  # we are working on a 256GB SSD, tasuketekure
         for roi in rois:  # roi maybe multiple
             prediction = torch.cat([p[0][roi] for p in predictions], 0).cpu()
-            if (not hparams['separate_rois']) and (len(hparams['rois'].split(',')) > 1):
+            if (not hparams['separate_rois']) and (len(hparams['rois'].split(',')) > 1):  # for bdcn_edge multi rois
                 for rroi, pred in zip(hparams['rois'].split(','),
                                       dokodemo_hsplit(prediction, hparams['idx_ends'])):  # roi is single
                     # print(pred.shape)
                     torch.save(pred, os.path.join(prediction_dir, f'{rroi}.pt'))
             else:
-                torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
-        os.remove(checkpoint_callback.best_model_path)
+                if voxel_idxs is None:
+                    torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
+                else:  # for WB sub divide
+                    if not args.debug:
+                        torch.save(prediction, os.path.join(prediction_dir, f'{roi}_{level}.pt'))
+                    torch.save(voxel_idxs, os.path.join(prediction_dir, f'{roi}_voxel_idxs_{level}.pt'))
+
+                    dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
+                                             num_frames=args.video_frames, resolution=args.video_size, track=args.track,
+                                             cached=args.cached, val_ratio=args.val_ratio,
+                                             random_split=args.val_random_split,
+                                             use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold,
+                                             additional_features_dir=args.additional_features_dir,
+                                             additional_features=args.additional_features,
+                                             preprocessing_type=args.preprocessing_type,
+                                             load_from_np=args.load_from_np,
+                                             voxel_idxs=voxel_idxs)
+                    dm.setup('fit')
+                    assert args.fold == -1 and args.val_ratio == 0.1
+                    outs = prediction[900:1000]
+                    ys = torch.cat([data[1] for data in dm.val_dataloader()], 0)
+                    voxel_corrs = vectorized_correlation(outs, ys).cpu()
+                    return voxel_corrs
 
 
-if __name__ == '__main__':
+def parse_args():
     parser = ArgumentParser()
     parser.add_argument('--video_frames', type=int, default=16)
     parser.add_argument('--video_size', type=int, default=288)
@@ -586,6 +621,9 @@ if __name__ == '__main__':
     parser.add_argument('--additional_features', type=str, default='')
     parser.add_argument('--additional_features_dir', type=str, default='/data_smr/huze/projects/my_algonauts/features/')
     parser.add_argument('--track', type=str, default='mini_track')
+    parser.add_argument('--divide_voxels', default=False, action="store_true")
+    parser.add_argument('--exclude_mini', default=False, action="store_true")
+    parser.add_argument('--divide_chunks', type=int, default=4)
     parser.add_argument('--backbone_type', type=str, default='i3d_rgb', help='i3d_rgb, bdcn_edge, i3d_flow')
     parser.add_argument('--rois', type=str, default="EBA")
     parser.add_argument('--subs', type=str, default="all")
@@ -614,5 +652,56 @@ if __name__ == '__main__':
 
     parser = LitModel.add_model_specific_args(parser)
     args = parser.parse_args()
+    return args
 
-    train(args)
+
+def train_and_divide_voxels(args):
+    assert args.track == 'full_track'
+    NUM_VOXELS = 161326
+    voxel_idxs = np.arange(NUM_VOXELS)
+
+    level = '1'
+    print(f'\n\nrunning level {level}\n\n')
+    voxel_corrs = train(args, voxel_idxs, level=level)
+
+    num_chunks = args.divide_chunks
+
+    new_voxel_idxs = torch.chunk(voxel_corrs.argsort(), num_chunks)
+    new_voxel_idxs = [voxel_idxs[new_i] for new_i in new_voxel_idxs]
+
+    i = 1
+    ii = 1
+    for i_new_voxel_idxs in new_voxel_idxs:
+        level = f'2-{i}'
+        print(f'\n\nrunning level {level}\n\n')
+        i_new_voxel_corrs = train(args, i_new_voxel_idxs, level=level)
+        i += 1
+
+        new_new_voxel_idxs = torch.chunk(i_new_voxel_corrs.argsort(), num_chunks)
+        new_new_voxel_idxs = [i_new_voxel_idxs[new_i] for new_i in new_new_voxel_idxs]
+
+        for i_new_new_voxel_idxs in new_new_voxel_idxs:
+            level = f'3-{ii}'
+            print(f'\n\nrunning level {level}\n\n')
+            _ = train(args, i_new_new_voxel_idxs, level=level)
+            ii += 1
+
+
+def main():
+    args = parse_args()
+
+    if args.divide_voxels:
+        train_and_divide_voxels(args)
+    else:
+        if args.exclude_mini:
+            config_file = 'voxels.json'
+            with open(config_file, 'r') as f:
+                roi_idxs = json.load(f)
+            rest_idxs = roi_idxs['REST']
+            train(args, voxel_idxs=rest_idxs)
+        else:
+            train(args)
+
+
+if __name__ == '__main__':
+    main()

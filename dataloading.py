@@ -143,7 +143,9 @@ class Permute(object):
 
 class AlgonautsDatasetI3dFreeze(Dataset):
     def __init__(self, dataset_dir, rois='EBA',
-                 train=True, cached=True, track='mini_track', subs='all'):
+                 train=True, cached=True, track='mini_track', subs='all',
+                 voxel_idxs=None):
+        self.voxel_idxs = voxel_idxs
         self.track = track
         self.cached = cached
         self.rois = rois
@@ -177,6 +179,13 @@ class AlgonautsDatasetI3dFreeze(Dataset):
                     [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir), self.file_df[sub].values)
                      for sub in self.subs])
 
+                if self.voxel_idxs is not None:
+                    self.fmris = self.fmris[:, self.voxel_idxs]
+
+            if self.track == 'full_track':
+                self.sub_idx_ends = self.idx_ends
+                self.idx_ends = np.array([self.fmris.shape[-1]])
+
     def __len__(self):
         return len(self.vid_file_list)
 
@@ -198,7 +207,8 @@ class AlgonautsDataset(Dataset):
                  additional_features_dir='',
                  rois='EBA', num_frames=16, resolution=288,
                  train=True, cached=True, track='mini_track', subs='all',
-                 preprocessing_type='mmit'):
+                 preprocessing_type='mmit', voxel_idxs=None):
+        self.voxel_idxs = voxel_idxs
         self.track = track
         self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
@@ -266,6 +276,13 @@ class AlgonautsDataset(Dataset):
                     [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir), self.file_df[sub].values)
                      for sub in self.subs])
 
+                if self.voxel_idxs is not None:
+                    self.fmris = self.fmris[:, self.voxel_idxs]
+
+            if self.track == 'full_track':
+                self.sub_idx_ends = self.idx_ends
+                self.idx_ends = np.array([self.fmris.shape[-1]])
+
     def __len__(self):
         return len(self.vid_file_list)
 
@@ -302,8 +319,10 @@ class AlgonautsDataModule(pl.LightningDataModule):
                  num_split=None,
                  fold=-1,
                  preprocessing_type='mmit',
-                 load_from_np=False):
+                 load_from_np=False,
+                 voxel_idxs=None):
         super().__init__()
+        self.voxel_idxs = voxel_idxs
         self.load_from_np = load_from_np
         self.preprocessing_type = preprocessing_type
         self.additional_features_dir = additional_features_dir
@@ -325,6 +344,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
         self.file_list = [os.path.join(self.datasets_dir, f) for f in self.file_list]
         self.batch_size = batch_size
 
+        self.algonauts_full = None
         self.train_dataset = None
         self.val_dataset = None
         self.test_dataset = None
@@ -353,6 +373,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     track=self.track,
                     subs=self.subs,
                     preprocessing_type=self.preprocessing_type,
+                    voxel_idxs=self.voxel_idxs,
                 )
             else:
                 self.algonauts_full = AlgonautsDatasetI3dFreeze(
@@ -362,6 +383,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     cached=self.cached,
                     track=self.track,
                     subs=self.subs,
+                    voxel_idxs=self.voxel_idxs,
                 )
             self.idx_ends = self.algonauts_full.idx_ends.tolist()
 
@@ -401,6 +423,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     track=self.track,
                     subs=self.subs,
                     preprocessing_type=self.preprocessing_type,
+                    voxel_idxs=self.voxel_idxs,
                 )
             else:
                 self.test_dataset = AlgonautsDatasetI3dFreeze(
@@ -410,6 +433,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     cached=self.cached,
                     track=self.track,
                     subs=self.subs,
+                    voxel_idxs=self.voxel_idxs,
                 )
 
     def train_dataloader(self):

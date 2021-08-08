@@ -317,7 +317,13 @@ class ConvResponseModel(nn.Module):
 
     def __init__(self, in_dim, out_dim, hparams):
         super(ConvResponseModel, self).__init__()
-        self.fc = nn.Sequential(nn.Linear(in_dim, 1024 * 4 * 5 * 4), nn.ELU())
+        self.layer_hidden = hparams['layer_hidden']
+        self.fc = nn.Sequential(
+            nn.Linear(in_dim, self.layer_hidden),
+            nn.ELU(),
+            nn.Linear(self.layer_hidden, 1024 * 4 * 5 * 4),
+            nn.ELU()
+        )
         if hparams['convtrans_bn']:
             self.convt = nn.Sequential(
                 nn.ConvTranspose3d(1024, 512, (3, 3, 3), (2, 2, 2)),
@@ -521,21 +527,37 @@ class I3d_neck(nn.Module):
                         self.ch_response.update({k: build_fc(
                             hparams, self.fc_input_dims[k], output_size, part='first')})
                     else:
-                        if not self.hparams['no_convtrans']:
+                        if self.hparams['track'] == 'full_track':
+                            if self.hparams['no_convtrans']:
+                                self.ch_response.update({k: build_fc(
+                                    hparams, self.fc_input_dims[k], output_size)})
+                            else:
+                                self.ch_response.update(
+                                    {k: ConvResponseModel(self.fc_input_dims[k], hparams['num_subs'], hparams)})
+                        else:
                             self.ch_response.update({k: build_fc(
                                 hparams, self.fc_input_dims[k], output_size)})
-                        else:
-                            self.ch_response.update(
-                                {k: ConvResponseModel(self.fc_input_dims[k], hparams['num_subs'], hparams)})
 
         if self.old_mix:
             in_size = self.hparams.first_layer_hidden * self.num_chs if hparams['final_fusion'] == 'concat' \
                 else self.hparams.first_layer_hidden
             for roi, output_size in zip(self.rois, self.output_sizes):
-                self.final_fusions.update({f'{roi}': nn.Sequential(
-                    FcFusion(fusion_type=hparams['final_fusion']),
-                    build_fc(self.hparams, in_size, output_size),
-                )})
+                if self.hparams['track'] == 'full_track':
+                    if self.hparams['no_convtrans']:
+                        self.final_fusions.update({f'{roi}': nn.Sequential(
+                            FcFusion(fusion_type=hparams['final_fusion']),
+                            build_fc(self.hparams, in_size, output_size),
+                        )})
+                    else:
+                        self.final_fusions.update({f'{roi}': nn.Sequential(
+                            FcFusion(fusion_type=hparams['final_fusion']),
+                            ConvResponseModel(in_size, hparams['num_subs'], hparams)
+                        )})
+                else:
+                    self.final_fusions.update({f'{roi}': nn.Sequential(
+                        FcFusion(fusion_type=hparams['final_fusion']),
+                        build_fc(self.hparams, in_size, output_size),
+                    )})
         else:
             for roi, output_size in zip(self.rois, self.output_sizes):
                 self.final_fusions.update({f'{roi}': ConvFusion(
@@ -576,7 +598,7 @@ class I3d_neck(nn.Module):
             roi_out = self.final_fusions[roi](roi_out_auxs)
             out[roi] = roi_out
 
-        out_aux = None if self.old_mix else x
+        out_aux = None if self.old_mix or self.hparams.track == 'full_track' else x
         # for x_i in self.pyramid_layers:
         #     for pathway in self.pathways:
         #         roi_out_auxs = []

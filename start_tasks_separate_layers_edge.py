@@ -15,8 +15,8 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
 
 available_devices = {
     '57': [4, 5, 6, 7],
-    '58': [3, 4, 5, 6, 7],
-    '59': [0, 2],
+    '58': [4, 5, 6, 7],
+    '59': [4, 5, 6, 7],
 }
 
 queue_names = []
@@ -175,7 +175,7 @@ def start_tasks_adaptive_pooling(rois, video_sizes, num_frames, rfs, freeze_bns,
 #
 # # 675
 start_tasks_adaptive_pooling(
-    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS'],
+    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS', 'V1,V2,V3,FFA,PPA,STS'],
     video_sizes=[32, 48, 64, 96, 128],
     num_frames=[4],
     rfs=[8, 10, 12, 14, 16, 20, 24, 28, 32],
@@ -199,7 +199,7 @@ start_tasks_adaptive_pooling(
 
 # # 675
 start_tasks_adaptive_pooling(
-    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS'],
+    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS', 'V1,V2,V3,FFA,PPA,STS'],
     video_sizes=[32, 48, 64, 96, 128],
     num_frames=[4],
     rfs=[8, 10, 12, 14, 16, 20, 24, 28, 32],
@@ -225,7 +225,7 @@ start_tasks_adaptive_pooling(
 
 # # 675
 start_tasks_adaptive_pooling(
-    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS'],
+    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS', 'V1,V2,V3,FFA,PPA,STS'],
     video_sizes=[32, 48, 64, 96, 128],
     num_frames=[10],
     rfs=[8, 10, 12, 14, 16, 20, 24, 28, 32],
@@ -249,7 +249,7 @@ start_tasks_adaptive_pooling(
 
 # # 675
 start_tasks_adaptive_pooling(
-    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS'],
+    rois=['V1', 'V2', 'V3', 'V4', 'V1,V2,V3,V4', 'EBA,LOC,STS', 'V1,V2,V3,EBA,LOC', 'EBA,LOC,FFA,PPA,STS', 'V1,V2,V3,FFA,PPA,STS'],
     video_sizes=[32, 48, 64, 96, 128],
     num_frames=[10],
     rfs=[8, 10, 12, 14, 16, 20, 24, 28, 32],
@@ -270,78 +270,5 @@ start_tasks_adaptive_pooling(
     layer_hiddens=[2048],
     batch_size=32,
 )
-
-
-#
-# # 63
-# start_tasks_adaptive_pooling(
-#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-#     layers=['x1'],
-#     rfs=[1, 2, 3, 4, 5, 6, 7],
-#     rf_ts=[1],
-#     freeze_bns=[True],
-#     pooling_modes=['adaptive_max'],
-#     batch_size=32,
-#     conv_size=192,
-# )
-
-# # 45
-# start_tasks_spp(
-#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-#     layers=['x1'],
-#     ps=[
-#         [1, 2, 3],
-#         [2, 3, 5],
-#         [3, 5, 7],
-#         [4, 6, 9],
-#         [5, 7, 11],
-#     ],
-#     pts=[
-#         [1, 1, 1],
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['max'],
-#     batch_size=32,
-#     conv_size=64,
-# )
-#
-# # 45
-# start_tasks_spp(
-#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-#     layers=['x2'],
-#     ps=[
-#         [1, 2, 3],
-#         [2, 3, 5],
-#         [3, 5, 7],
-#         [4, 6, 9],
-#         [5, 7, 11],
-#     ],
-#     pts=[
-#         [1, 1, 1],
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     batch_size=32,
-#     conv_size=64,
-# )
-
-# # 72
-# start_tasks_spp(
-#     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS', 'V1', 'V2', 'V3', 'V4'],
-#     layers=['x3', 'x4'],
-#     ps=[
-#         [1, 2, 3],
-#         [2, 3, 5],
-#         [3, 5, 7],
-#         [5, 6, 7],
-#     ],
-#     pts=[
-#         [1, 1, 1],
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     batch_size=32,
-#     conv_size=64,
-# )
 
 print(task_ids)
