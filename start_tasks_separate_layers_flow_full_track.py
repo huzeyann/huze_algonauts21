@@ -15,7 +15,6 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
 
 available_devices = {
     '57': [2, 3],
-    '58': [2, 3],
     '59': [2, 3],
 }
 
@@ -176,18 +175,10 @@ def start_tasks_x5(rois, layers, freeze_bns, batch_size=32, conv_size=1024):
                 task_ids.append(cloned_task.id)
 
 
-# # 9
-start_tasks_x5(
-    rois=['WB'],
-    layers=['x5'],
-    freeze_bns=[True],
-    batch_size=32,
-    conv_size=1024,
-)
 # # 45
 start_tasks_spp(
     rois=['WB'],
-    layers=['x1,x2,x3,x4', 'x2,x3,x4'],
+    layers=['x1,x2,x3,x4', 'x2,x3,x4', 'x1,x2', 'x3,x4'],
     ps=[
         [1, 2, 3],
         [1, 3, 5],
@@ -200,9 +191,18 @@ start_tasks_spp(
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
-    pathways=['none', 'topdown'],
+    pathways=['none'],
     batch_size=24,
     conv_size=256,
+)
+
+# # 9
+start_tasks_x5(
+    rois=['WB'],
+    layers=['x5'],
+    freeze_bns=[True],
+    batch_size=32,
+    conv_size=1024,
 )
 
 print(task_ids)

@@ -28,7 +28,7 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts full_track model zoo'
+PROJECT_NAME = 'Algonauts merge layers'
 
 task = Task.init(
     project_name=PROJECT_NAME,

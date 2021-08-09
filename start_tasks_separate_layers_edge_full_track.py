@@ -14,9 +14,9 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
 available_devices = {
-    '57': [2, 3],
-    '58': [2, 3],
-    '59': [2, 3],
+    '57': [4, 5, 6, 7],
+    '58': [4, 5, 6, 7],
+    '59': [4, 6, 7],
 }
 
 queue_names = []
@@ -103,17 +103,56 @@ def start_tasks_spp(rois, video_sizes, num_frames, ps, freeze_bns, pooling_modes
                                     task_ids.append(cloned_task.id)
 #
 # # 675
+# start_tasks_spp(
+#     rois=['WB'],
+#     video_sizes=[32, 48, 64, 96, 128],
+#     num_frames=[4, 10],
+#     ps=[
+#         [3, 6, 9],
+#         [6, 12, 18],
+#         [8, 16, 24],
+#         [12, 20, 32],
+#         [16, 24, 32]
+#     ],
+#     freeze_bns=[False],
+#     pooling_modes=['max'],
+#     num_lstm_layers=[1],
+#     layer_hiddens=[2048],
+#     batch_size=32,
+# )
+
+
 start_tasks_spp(
     rois=['WB'],
-    video_sizes=[32, 48, 64, 96, 128],
-    num_frames=[4, 10],
+    video_sizes=[48, 64, 96, 128],
+    num_frames=[10],
     ps=[
         [3, 6, 9],
         [6, 12, 18],
         [8, 16, 24],
         [12, 20, 32],
+        [16, 24, 32]
     ],
-    freeze_bns=[False],
+    freeze_bns=[True],
+    pooling_modes=['max'],
+    num_lstm_layers=[1],
+    layer_hiddens=[2048],
+    batch_size=32,
+)
+
+
+start_tasks_spp(
+    rois=['WB'],
+    video_sizes=[96, 128],
+    num_frames=[4],
+    ps=[
+        [3, 6, 9],
+        [6, 12, 18],
+        [8, 16, 24],
+        [12, 20, 32],
+        [16, 24, 32]
+    ],
+    freeze_bns=[True],
     pooling_modes=['max'],
     num_lstm_layers=[1],
     layer_hiddens=[2048],

@@ -2,7 +2,7 @@ import itertools
 
 from clearml import Task
 
-PROJECT_NAME = 'Algonauts full_track model zoo'
+PROJECT_NAME = 'Algonauts merge layers'
 BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
@@ -14,7 +14,7 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
 available_devices = {
-    '16': [0, 1]
+    '16': [0, 1],
 }
 
 queue_names = []
@@ -27,8 +27,8 @@ task_ids = []
 
 
 def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, batch_size=32):
-    for roi in rois:
-        for layer in layers:
+    for layer in layers:
+        for roi in rois:
             for p in ps:
                 for freeze_bn in freeze_bns:
                     for pooling_mode in pooling_modes:
@@ -50,32 +50,24 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, batch
                             cloned_task_parameters = cloned_task.get_parameters()
                             # cloned_task_parameters['rois'] = [roi]
                             cloned_task_parameters['Args/rois'] = roi
-                            cloned_task_parameters['Args/track'] = 'full_track'
-                            cloned_task_parameters['Args/video_size'] = 288
-                            cloned_task_parameters['Args/crop_size'] = 0
-                            cloned_task_parameters['Args/video_frames'] = 16
-                            cloned_task_parameters['Args/backbone_type'] = 'i3d_rgb'
-                            cloned_task_parameters['Args/preprocessing_type'] = 'mmit'
-                            cloned_task_parameters['Args/load_from_np'] = False
+                            cloned_task_parameters['Args/track'] = 'mini_track'
+                            # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
                             cloned_task_parameters['Args/learning_rate'] = 1e-4
-                            cloned_task_parameters['Args/step_lr_epochs'] = [10]
-                            cloned_task_parameters['Args/step_lr_ratio'] = 1.0
-                            cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 4
+                            cloned_task_parameters['Args/step_lr_epochs'] = [4]
+                            cloned_task_parameters['Args/step_lr_ratio'] = 0.5
+                            cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 8
                             cloned_task_parameters['Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
-                                batch_size / 4)
-                            cloned_task_parameters['Args/num_layers'] = 2
+                                batch_size / 8)
+                            cloned_task_parameters['Args/num_layers'] = 1
                             cloned_task_parameters['Args/conv_size'] = 256
                             cloned_task_parameters['Args/first_layer_hidden'] = 2048
                             cloned_task_parameters['Args/layer_hidden'] = 2048
                             cloned_task_parameters['Args/debug'] = False
-                            cloned_task_parameters['Args/fp16'] = True
                             cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                             cloned_task_parameters['Args/old_mix'] = True
-                            cloned_task_parameters['Args/no_convtrans'] = False
-                            cloned_task_parameters['Args/early_stop_epochs'] = 10
-                            cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5
-                            cloned_task_parameters['Args/backbone_freeze_epochs'] = 10
+                            cloned_task_parameters['Args/early_stop_epochs'] = 5
                             cloned_task_parameters['Args/max_epochs'] = 100
+                            cloned_task_parameters['Args/backbone_freeze_epochs'] = 4
                             cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
                             cloned_task_parameters['Args/pooling_mode'] = pooling_mode
                             for l in layer.split(','):
@@ -89,7 +81,6 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, batch
                             cloned_task_parameters['Args/val_check_interval'] = 1.0
                             cloned_task_parameters['Args/val_ratio'] = 0.1
                             cloned_task_parameters['Args/save_checkpoints'] = True
-                            cloned_task_parameters['Args/checkpoints_dir'] = '/home/huze/checkpoints/'
                             cloned_task_parameters[
                                 'Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
 
@@ -103,40 +94,20 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, batch
                             task_ids.append(cloned_task.id)
 
 
-# start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x1,x2,x3,x4', 'x2,x3,x4'],
-#     ps=[
-#         [1, 2, 3],
-#         [1, 3, 5],
-#         [1, 5, 9],
-#         [3, 5, 7],
-#         [2, 4, 6],
-#         [4, 6, 9]
-#     ],
-#     freeze_bns=[False, True],
-#     pooling_modes=['avg'],
-#     pathways=['none', 'topdown'],
-#     batch_size=24
-# )
-
-
 start_tasks_spp(
-    rois=['WB'],
-    layers=['x2,x3,x4'],
+    rois=['V1', 'V2', 'V3', 'V4', 'EBA', 'LOC', 'PPA', 'FFA', 'STS'],
+    layers=['x1,x2,x3,x4', 'x2,x3,x4', 'x1,x2,x3'],
     ps=[
         [1, 2, 3],
-        [1, 3, 5],
-        [1, 5, 9],
+        [2, 3, 4],
+        [3, 4, 5],
         [3, 5, 7],
-        [2, 4, 6],
-        [4, 6, 9]
+        [4, 6, 9],
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
     pathways=['none', 'topdown'],
-    batch_size=24
+    batch_size=32
 )
-
 
 print(task_ids)
