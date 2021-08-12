@@ -141,10 +141,11 @@ class Permute(object):
         return tensor.permute(1, 0, 2, 3)
 
 
-class AlgonautsDatasetI3dFreeze(Dataset):
+class AlgonautsDatasetFreeze(Dataset):
     def __init__(self, dataset_dir, rois='EBA',
                  train=True, cached=True, track='mini_track', subs='all',
-                 voxel_idxs=None):
+                 voxel_idxs=None, preprocessing_type='flow'):
+        self.preprocessing_type = preprocessing_type
         self.voxel_idxs = voxel_idxs
         self.track = track
         self.cached = cached
@@ -159,7 +160,11 @@ class AlgonautsDatasetI3dFreeze(Dataset):
         csv_path = os.path.join(self.dataset_dir, csv)
         self.file_df = pd.read_csv(csv_path)
         self.vid_file_list = self.file_df['vid'].values
-        self.vid_file_list = [x.replace('.mp4', '_flow.pkl') for x in self.vid_file_list]
+        if self.preprocessing_type == 'flow':
+            post_fix = '_flow.pkl'
+        elif self.preprocessing_type == 'vggish':
+            post_fix = '_vggish.npy'
+        self.vid_file_list = [x.replace('.mp4', post_fix) for x in self.vid_file_list]
         self.vid_root = os.path.join(self.dataset_dir, 'numpy')
         if self.track == 'full_track':
             assert self.rois == 'WB'
@@ -191,8 +196,19 @@ class AlgonautsDatasetI3dFreeze(Dataset):
 
     def __getitem__(self, index):
 
-        x = np.load(os.path.join(self.vid_root, self.vid_file_list[index]), allow_pickle=True)
-        x = {k: torch.tensor(v).squeeze(0) for k, v in x.items()}
+        if self.preprocessing_type == 'flow':
+            x = np.load(os.path.join(self.vid_root, self.vid_file_list[index]), allow_pickle=True)
+            x = {k: torch.tensor(v).squeeze(0) for k, v in x.items()}
+        elif self.preprocessing_type == 'vggish':
+            try:
+                x = np.load(os.path.join(self.vid_root, self.vid_file_list[index]), allow_pickle=True).astype(np.float32)
+                x = x.reshape(-1)
+            except Exception as e:
+                # print(index, e)
+                x = np.zeros(128 * 3).astype(np.float32)
+            x = {'audio': torch.tensor(x).squeeze(0)}
+        else:
+            NotImplementedError()
 
         if self.train:
             y = self.fmris[index]
@@ -376,7 +392,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     voxel_idxs=self.voxel_idxs,
                 )
             else:
-                self.algonauts_full = AlgonautsDatasetI3dFreeze(
+                self.algonauts_full = AlgonautsDatasetFreeze(
                     self.datasets_dir,
                     train=True,
                     rois=self.rois,
@@ -384,6 +400,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     track=self.track,
                     subs=self.subs,
                     voxel_idxs=self.voxel_idxs,
+                    preprocessing_type=self.preprocessing_type,
                 )
             self.idx_ends = self.algonauts_full.idx_ends.tolist()
 
@@ -426,7 +443,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     voxel_idxs=self.voxel_idxs,
                 )
             else:
-                self.test_dataset = AlgonautsDatasetI3dFreeze(
+                self.test_dataset = AlgonautsDatasetFreeze(
                     self.datasets_dir,
                     train=False,
                     rois=self.rois,
@@ -434,6 +451,7 @@ class AlgonautsDataModule(pl.LightningDataModule):
                     track=self.track,
                     subs=self.subs,
                     voxel_idxs=self.voxel_idxs,
+                    preprocessing_type=self.preprocessing_type,
                 )
 
     def train_dataloader(self):

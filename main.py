@@ -28,7 +28,9 @@ import pandas as pd
 
 from clearml import Task, Logger
 
-PROJECT_NAME = 'Algonauts merge layers'
+from vggish_neck import VggishNeck
+
+PROJECT_NAME = 'Algonauts audio'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -95,6 +97,8 @@ class LitModel(LightningModule):
             self.neck = I3d_neck(self.hparams)
         elif self.hparams.backbone_type == 'bdcn_edge':
             self.neck = BDCNNeck(self.hparams)
+        elif self.hparams.backbone_type == 'vggish':
+            self.neck = VggishNeck(self.hparams)
         else:
             NotImplementedError()
 
@@ -522,6 +526,8 @@ def train(args, voxel_idxs=None, level: str = ''):
     elif args.backbone_type == 'i3d_flow':
         backbone = load_i3d_flow(args.i3d_flow_path)
         # backbone = None
+    elif args.backbone_type == 'vggish':
+        backbone = nn.Module()
     else:
         NotImplementedError()
 
