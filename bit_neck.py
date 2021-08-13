@@ -96,12 +96,12 @@ class BitNeck(nn.Module):
         else:
             self.first_conv = nn.Conv2d(self.c_dict[self.layer], self.planes, kernel_size=1, stride=1)
             if hparams['spp']:
-                levels = np.array([hparams['spp_size'], hparams['spp_size']])
+                levels = np.array(hparams['spp_size'])
                 self.pooling = SpatialPyramidPooling2D(
                     levels=levels,
                     mode=hparams['pooling_mode']
                 )
-                in_dim = np.sum(levels[0] * levels[1]) * self.planes
+                in_dim = np.sum(levels * levels) * self.planes
             else:
                 if hparams['pooling_mode'] == 'avg':
                     self.pooling = nn.AdaptiveAvgPool2d(hparams['pooling_size'])
