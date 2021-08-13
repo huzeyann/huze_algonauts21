@@ -71,6 +71,7 @@ def start_tasks_spp(rois, video_sizes, num_frames, ps, freeze_bns, pooling_modes
                                         cloned_task_parameters['Args/layer_hidden'] = layer_hidden
                                         cloned_task_parameters['Args/conv_size'] = 256
                                         cloned_task_parameters['Args/debug'] = False
+                                        cloned_task_parameters['Args/fp16'] = True
                                         cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                                         cloned_task_parameters['Args/early_stop_epochs'] = 10
                                         cloned_task_parameters['Args/backbone_lr_ratio'] = 1.0
@@ -143,6 +144,7 @@ def start_tasks_x5(rois, video_sizes, num_frames, freeze_bns, num_lstm_layers,
                             cloned_task_parameters['Args/lstm_layers'] = num_lstm_layer
                             cloned_task_parameters['Args/layer_hidden'] = layer_hidden
                             cloned_task_parameters['Args/debug'] = False
+                            cloned_task_parameters['Args/fp16'] = True
                             cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                             cloned_task_parameters['Args/early_stop_epochs'] = 10
                             cloned_task_parameters['Args/backbone_lr_ratio'] = 1.0
