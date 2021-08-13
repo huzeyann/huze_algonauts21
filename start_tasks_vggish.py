@@ -32,7 +32,7 @@ def start_tasks_mini(rois, batch_size=64):
 
         tags = [roi]
         cloned_task = Task.clone(source_task=template_task,
-                                 name=','.join(tags),
+                                 name='task ' + ','.join(tags),
                                  parent=template_task.id)
 
         cloned_task.add_tags(tags)

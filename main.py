@@ -14,6 +14,8 @@ from torch import Tensor
 from torch.nn import SyncBatchNorm
 from torch.optim.lr_scheduler import MultiStepLR, StepLR
 
+from bit import load_bit
+from bit_neck import BitNeck
 from callbacks import ReduceAuxLossWeight
 
 from bdcn import load_bdcn
@@ -30,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts audio'
+PROJECT_NAME = 'debug'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -99,6 +101,8 @@ class LitModel(LightningModule):
             self.neck = BDCNNeck(self.hparams)
         elif self.hparams.backbone_type == 'vggish':
             self.neck = VggishNeck(self.hparams)
+        elif self.hparams.backbone_type == 'bit':
+            self.neck = BitNeck(self.hparams)
         else:
             NotImplementedError()
 
@@ -207,15 +211,24 @@ class LitModel(LightningModule):
                 s = x_vid.shape
                 x_vid = x_vid.reshape(s[0] * s[1], *s[2:])
 
-            out_vid = self.backbone(x_vid)
+                out_vid = self.backbone(x_vid)
 
-            if self.hparams.backbone_type == 'bdcn_edge':
                 # img to vid
                 out_vid = out_vid.reshape(s[0], s[1], s[3], s[4])
                 if self.training == False:
                     self.logger.experiment[0].add_image('edges', F.sigmoid(out_vid[0, -1, :, :]),
                                                         global_step=self.global_step, dataformats='HW')
                     # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
+            elif self.hparams.backbone_type == 'bit':
+                x_vid = x_vid.permute(0, 2, 1, 3, 4)
+                s = x_vid.shape
+                x_vid = x_vid.reshape(s[0] * s[1], *s[2:])
+
+                outs = self.backbone(x_vid)
+                # out_vid = {}
+                # for x_i, out in outs.items():
+                #     out_vid[x_i] = out.reshape(s[0] * s[1], -1, s[3], s[4]) if x_i != 'x5' else out
+                out_vid = outs
         else:
             out_vid = x
 
@@ -525,9 +538,10 @@ def train(args, voxel_idxs=None, level: str = ''):
         backbone = load_bdcn(args.bdcn_path)
     elif args.backbone_type == 'i3d_flow':
         backbone = load_i3d_flow(args.i3d_flow_path)
-        # backbone = None
     elif args.backbone_type == 'vggish':
         backbone = nn.Module()
+    elif args.backbone_type == 'bit':
+        backbone = load_bit(args.bit_path)
     else:
         NotImplementedError()
 
@@ -624,13 +638,15 @@ def parse_args():
                         default='/home/huze/algonauts_datasets/models/bdcn_pretrained_on_bsds500.pth')
     parser.add_argument('--i3d_flow_path', type=str,
                         default='/data_smr/huze/projects/my_algonauts/video_features/models/i3d/checkpoints/i3d_flow.pt')
+    parser.add_argument('--bit_path', type=str,
+                        default='/home/huze/algonauts_datasets/models/R50x1_224.npz')
     parser.add_argument('--additional_features', type=str, default='')
     parser.add_argument('--additional_features_dir', type=str, default='/data_smr/huze/projects/my_algonauts/features/')
     parser.add_argument('--track', type=str, default='mini_track')
     parser.add_argument('--divide_voxels', default=False, action="store_true")
     parser.add_argument('--exclude_mini', default=False, action="store_true")
     parser.add_argument('--divide_chunks', type=int, default=4)
-    parser.add_argument('--backbone_type', type=str, default='i3d_rgb', help='i3d_rgb, bdcn_edge, i3d_flow')
+    parser.add_argument('--backbone_type', type=str, default='i3d_rgb', help='i3d_rgb, bdcn_edge, i3d_flow, bit')
     parser.add_argument('--rois', type=str, default="EBA")
     parser.add_argument('--subs', type=str, default="all")
     parser.add_argument('--num_subs', type=int, default=10)
@@ -645,7 +661,7 @@ def parse_args():
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
     parser.add_argument('--use_cv', default=False, action="store_true")
     parser.add_argument('--fold', type=int, default=-1)
-    parser.add_argument('--preprocessing_type', type=str, default='mmit', help='mmit, bdcn, i3d_flow')
+    parser.add_argument('--preprocessing_type', type=str, default='mmit', help='mmit, bdcn, i3d_flow, bit')
     parser.add_argument('--early_stop_epochs', type=int, default=10)
     parser.add_argument('--cached', default=False, action="store_true")
     parser.add_argument("--fp16", default=False, action="store_true")

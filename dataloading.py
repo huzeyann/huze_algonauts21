@@ -106,6 +106,12 @@ def wrap_load_one_video(root, file, num_frames=16, resolution=288, preprocessing
             RGB2BGR(),
             TwoFiveFive(),
         ])
+    elif preprocessing_type == 'bit':
+        resize_normalize = transforms.Compose([
+            transforms.Resize((resolution, resolution)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+        ])
     else:
         NotImplementedError()
 
