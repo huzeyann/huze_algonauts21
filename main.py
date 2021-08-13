@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts separate layers bit'
+PROJECT_NAME = 'Algonauts separate layers bit full track'
 
 task = Task.init(
     project_name=PROJECT_NAME,

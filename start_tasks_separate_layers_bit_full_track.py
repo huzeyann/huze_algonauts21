@@ -2,7 +2,7 @@ import itertools
 
 from clearml import Task
 
-PROJECT_NAME = 'Algonauts separate layers bit'
+PROJECT_NAME = 'Algonauts separate layers bit full track'
 BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
@@ -26,14 +26,12 @@ queues_buffer = itertools.cycle(queue_names)
 task_ids = []
 
 
-def start_tasks_adaptive_pooling(rois, video_sizes, num_frames, rfs, freeze_bns, pooling_modes, num_lstm_layers,
-                                 layer_hiddens, layers,
-                                 batch_size=32):
+def start_tasks_spp(rois, video_sizes, num_frames, ps, freeze_bns, pooling_modes, num_lstm_layers,
+                    layer_hiddens, layers,
+                    batch_size=32):
     for video_size in video_sizes:
         for num_frame in num_frames:
-            for rf in rfs:
-                if rf > video_size:
-                    continue
+            for p in ps:
                 for freeze_bn in freeze_bns:
                     for pooling_mode in pooling_modes:
                         for num_lstm_layer in num_lstm_layers:
@@ -43,7 +41,7 @@ def start_tasks_adaptive_pooling(rois, video_sizes, num_frames, rfs, freeze_bns,
                                         assert pooling_mode in ['max', 'avg']
                                         queue = next(queues_buffer)
 
-                                        p_text = f'rf_{rf}'
+                                        p_text = '-'.join([str(i) for i in p])
                                         freeze_text = 'f_bn' if freeze_bn else 'nof_bn'
                                         lstm_text = f'lstm_{num_lstm_layer}'
                                         video_text = f'{video_size}_{num_frame}'
@@ -59,7 +57,7 @@ def start_tasks_adaptive_pooling(rois, video_sizes, num_frames, rfs, freeze_bns,
                                         cloned_task_parameters = cloned_task.get_parameters()
                                         # cloned_task_parameters['rois'] = [roi]
                                         cloned_task_parameters['Args/rois'] = roi
-                                        cloned_task_parameters['Args/track'] = 'mini_track'
+                                        cloned_task_parameters['Args/track'] = 'full_track'
                                         cloned_task_parameters['Args/video_size'] = video_size
                                         cloned_task_parameters['Args/video_frames'] = num_frame
                                         # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
@@ -79,11 +77,13 @@ def start_tasks_adaptive_pooling(rois, video_sizes, num_frames, rfs, freeze_bns,
                                         cloned_task_parameters['Args/backbone_freeze_epochs'] = 4
                                         cloned_task_parameters['Args/max_epochs'] = 100
                                         cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
+                                        cloned_task_parameters['Args/spp'] = True
                                         cloned_task_parameters['Args/pooling_mode'] = pooling_mode
-                                        cloned_task_parameters['Args/pooling_size'] = rf
+                                        cloned_task_parameters['Args/spp_size'] = p
                                         cloned_task_parameters['Args/pyramid_layers'] = layer
                                         cloned_task_parameters['Args/pathways'] = 'none'
                                         cloned_task_parameters['Args/old_mix'] = True
+                                        cloned_task_parameters['Args/no_convtrans'] = True
                                         cloned_task_parameters['Args/backbone_type'] = 'bit'
                                         cloned_task_parameters['Args/preprocessing_type'] = 'bit'
                                         cloned_task_parameters['Args/load_from_np'] = False
@@ -130,7 +130,7 @@ def start_tasks_x5(rois, video_sizes, num_frames, freeze_bns, num_lstm_layers,
                             cloned_task_parameters = cloned_task.get_parameters()
                             # cloned_task_parameters['rois'] = [roi]
                             cloned_task_parameters['Args/rois'] = roi
-                            cloned_task_parameters['Args/track'] = 'mini_track'
+                            cloned_task_parameters['Args/track'] = 'full_track'
                             cloned_task_parameters['Args/video_size'] = video_size
                             cloned_task_parameters['Args/video_frames'] = num_frame
                             # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
@@ -152,6 +152,7 @@ def start_tasks_x5(rois, video_sizes, num_frames, freeze_bns, num_lstm_layers,
                             cloned_task_parameters['Args/pyramid_layers'] = 'x5'
                             cloned_task_parameters['Args/pathways'] = 'none'
                             cloned_task_parameters['Args/old_mix'] = True
+                            cloned_task_parameters['Args/no_convtrans'] = True
                             cloned_task_parameters['Args/backbone_type'] = 'bit'
                             cloned_task_parameters['Args/preprocessing_type'] = 'bit'
                             cloned_task_parameters['Args/load_from_np'] = False
@@ -171,8 +172,9 @@ def start_tasks_x5(rois, video_sizes, num_frames, freeze_bns, num_lstm_layers,
 
                             task_ids.append(cloned_task.id)
 
+
 start_tasks_x5(
-    rois=['V1', 'V2', 'V3', 'V4', 'EBA', 'LOC', 'FFA', 'PPA', 'STS'],
+    rois=['WB'],
     video_sizes=[224],
     num_frames=[4],
     freeze_bns=[True],
@@ -181,11 +183,14 @@ start_tasks_x5(
     batch_size=32,
 )
 
-start_tasks_adaptive_pooling(
-    rois=['V1', 'V2', 'V3', 'V4', 'EBA', 'LOC', 'FFA', 'PPA', 'STS'],
+start_tasks_spp(
+    rois=['WB'],
     video_sizes=[224],
     num_frames=[4],
-    rfs=[1, 2, 3, 4, 5, 6, 7],
+    ps=[
+        [1, 3, 5],
+        [2, 6, 9],
+    ],
     freeze_bns=[True],
     pooling_modes=['avg'],
     num_lstm_layers=[1],
