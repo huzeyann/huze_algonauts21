@@ -108,14 +108,13 @@ start_tasks_spp(
     rois=['WB'],
     layers=['x1,x2,x3,x4', 'x2,x3,x4'],
     ps=[
-        [1, 2, 3],
         [1, 3, 5],
         [1, 5, 9],
         [3, 5, 7],
         [2, 4, 6],
         [4, 6, 9]
     ],
-    freeze_bns=[False, True],
+    freeze_bns=[True],
     pooling_modes=['avg'],
     pathways=['none', 'topdown'],
     batch_size=24
