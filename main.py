@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts separate layers bit full track'
+PROJECT_NAME = 'Algonauts full_track analysis'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -590,7 +590,9 @@ def train(args, voxel_idxs=None, level: str = ''):
         plmodel = LitModel.load_from_checkpoint(checkpoint_callback.best_model_path, backbone=backbone,
                                                 hparams=hparams, voxel_idxs=voxel_idxs)
         predictions = trainer.predict(plmodel, datamodule=dm)
-        os.remove(checkpoint_callback.best_model_path)  # we are working on a 256GB SSD, tasuketekure
+        if args.rm_checkpoints:
+            os.remove(checkpoint_callback.best_model_path)  # we are working on a 256GB SSD, tasuketekure
+
         for roi in rois:  # roi maybe multiple
             prediction = torch.cat([p[0][roi] for p in predictions], 0).cpu()
             if (not hparams['separate_rois']) and (len(hparams['rois'].split(',')) > 1):  # for bdcn_edge multi rois
@@ -669,6 +671,7 @@ def parse_args():
     parser.add_argument("--debug", default=False, action="store_true")
     parser.add_argument('--predictions_dir', type=str, default='/data_smr/huze/projects/my_algonauts/predictions/')
     parser.add_argument('--checkpoints_dir', type=str, default='/home/huze/checkpoints/')
+    parser.add_argument('--rm_checkpoints', default=False, action="store_true")
     parser.add_argument('--logs_dir', type=str, default='/data_smr/huze/projects/my_algonauts/')
     parser.add_argument('--i3d_rgb_dir', type=str, default='/home/huze/.cache/')
 
