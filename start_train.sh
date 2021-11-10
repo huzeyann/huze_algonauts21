@@ -1,2 +1,1 @@
-python main.py \
---accumulate_grad_batches 6
+python main.py --cached --use_cv --save_checkpoints --fp16 --old_mix --final_fusion concat --debug

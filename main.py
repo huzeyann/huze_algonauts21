@@ -161,10 +161,10 @@ class LitModel(LightningModule):
         parser.add_argument('--pooling_size_t_x2', type=int, default=4)
         parser.add_argument('--pooling_size_t_x3', type=int, default=2)
         parser.add_argument('--pooling_size_t_x4', type=int, default=1)
-        parser.add_argument('--spp_size_x1', type=int, nargs='+', help='SPP')
-        parser.add_argument('--spp_size_x2', type=int, nargs='+', help='SPP')
-        parser.add_argument('--spp_size_x3', type=int, nargs='+', help='SPP')
-        parser.add_argument('--spp_size_x4', type=int, nargs='+', help='SPP')
+        parser.add_argument('--spp_size_x1', type=int, nargs='+', help='SPP', default=[1, 2, 3])
+        parser.add_argument('--spp_size_x2', type=int, nargs='+', help='SPP', default=[1, 2, 3])
+        parser.add_argument('--spp_size_x3', type=int, nargs='+', help='SPP', default=[1, 2, 3])
+        parser.add_argument('--spp_size_x4', type=int, nargs='+', help='SPP', default=[1, 2, 3])
         parser.add_argument('--spp_size_t_x1', type=int, nargs='+', help='SPP', default=[1, 2, 2])
         parser.add_argument('--spp_size_t_x2', type=int, nargs='+', help='SPP', default=[1, 2, 2])
         parser.add_argument('--spp_size_t_x3', type=int, nargs='+', help='SPP', default=[1, 2, 2])
@@ -229,6 +229,8 @@ class LitModel(LightningModule):
                 # for x_i, out in outs.items():
                 #     out_vid[x_i] = out.reshape(s[0] * s[1], -1, s[3], s[4]) if x_i != 'x5' else out
                 out_vid = outs
+            elif self.hparams.backbone_type == 'i3d_rgb':
+                out_vid = self.backbone(x_vid)
         else:
             out_vid = x
 
