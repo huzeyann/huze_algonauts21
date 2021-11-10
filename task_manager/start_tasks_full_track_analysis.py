@@ -89,6 +89,7 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, batch
                             cloned_task_parameters['Args/val_check_interval'] = 1.0
                             cloned_task_parameters['Args/val_ratio'] = 0.1
                             cloned_task_parameters['Args/save_checkpoints'] = True
+                            cloned_task_parameters['Args/rm_checkpoints'] = False
                             cloned_task_parameters['Args/checkpoints_dir'] = '/home/huze/checkpoints/'
                             cloned_task_parameters[
                                 'Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
@@ -103,27 +104,9 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, batch
                             task_ids.append(cloned_task.id)
 
 
-# start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x1,x2,x3,x4', 'x2,x3,x4'],
-#     ps=[
-#         [1, 2, 3],
-#         [1, 3, 5],
-#         [1, 5, 9],
-#         [3, 5, 7],
-#         [2, 4, 6],
-#         [4, 6, 9]
-#     ],
-#     freeze_bns=[False, True],
-#     pooling_modes=['avg'],
-#     pathways=['none', 'topdown'],
-#     batch_size=24
-# )
-
-
 start_tasks_spp(
     rois=['WB'],
-    layers=['x2,x3,x4'],
+    layers=['x1,x2,x3,x4', 'x2,x3,x4'],
     ps=[
         [1, 2, 3],
         [1, 3, 5],
@@ -132,11 +115,29 @@ start_tasks_spp(
         [2, 4, 6],
         [4, 6, 9]
     ],
-    freeze_bns=[True],
+    freeze_bns=[False, True],
     pooling_modes=['avg'],
     pathways=['none', 'topdown'],
     batch_size=24
 )
+
+
+# start_tasks_spp(
+#     rois=['WB'],
+#     layers=['x2,x3,x4'],
+#     ps=[
+#         [1, 2, 3],
+#         [1, 3, 5],
+#         [1, 5, 9],
+#         [3, 5, 7],
+#         [2, 4, 6],
+#         [4, 6, 9]
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     pathways=['none', 'topdown'],
+#     batch_size=24
+# )
 
 
 print(task_ids)
