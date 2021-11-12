@@ -241,6 +241,7 @@ class AlgonautsDataset(Dataset):
         self.num_frames = num_frames
         self.train = train
         self.dataset_dir = dataset_dir
+        self.flow_dir = os.path.join(dataset_dir, 'flows', 'my')
         self.subs = [f'sub{i + 1:02d}' for i in range(10)] if subs == 'all' else subs.split(',')
         if self.train:
             csv = 'train_val-mini.csv' if self.track == 'mini_track' else 'train_val-full.csv'
@@ -263,25 +264,30 @@ class AlgonautsDataset(Dataset):
         else:
             self.additional_features = []
 
-        if self.cached:
-            self.cached_dir = os.path.join(self.dataset_dir,
-                                           f'{self.resolution}_{self.num_frames}_{self.preprocessing_type}_npy')
-            # save to np
-            os.makedirs(self.cached_dir, exist_ok=True)
-            for file in tqdm(self.vid_file_list):
-                name = os.path.basename(file).replace('.mp4', '.npy')
-                path = os.path.join(self.cached_dir, name)
-                if not os.path.exists(path):
-                    vid = wrap_load_one_video(self.vid_root, file,
-                                              num_frames=self.num_frames,
-                                              resolution=self.resolution,
-                                              preprocessing_type=self.preprocessing_type)
-                    np.save(path, vid.numpy())
-        else:
-            NotImplementedError()
+        if not self.preprocessing_type == 'i3d_flow': # load mp4
+            if self.cached:
+                self.cached_dir = os.path.join(self.dataset_dir,
+                                               f'{self.resolution}_{self.num_frames}_{self.preprocessing_type}_npy')
+                # save to np
+                os.makedirs(self.cached_dir, exist_ok=True)
+                for file in tqdm(self.vid_file_list):
+                    name = os.path.basename(file).replace('.mp4', '.npy')
+                    path = os.path.join(self.cached_dir, name)
+                    if not os.path.exists(path):
+                        vid = wrap_load_one_video(self.vid_root, file,
+                                                  num_frames=self.num_frames,
+                                                  resolution=self.resolution,
+                                                  preprocessing_type=self.preprocessing_type)
+                        np.save(path, vid.numpy())
+            else:
+                NotImplementedError()
+            self.np_paths = [os.path.join(self.cached_dir, os.path.basename(f).replace('.mp4', '.npy'))
+                             for f in self.vid_file_list]
+        else: # load numpy
+            # load on call
+            self.np_paths = [os.path.join(self.flow_dir, os.path.basename(f).replace('.mp4', '_flow_raft.npy'))
+                             for f in self.vid_file_list]
 
-        self.np_paths = [os.path.join(self.cached_dir, os.path.basename(f).replace('.mp4', '.npy'))
-                         for f in self.vid_file_list]
 
         # load fmri
         if train:

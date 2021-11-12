@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts full_track analysis'
+PROJECT_NAME = 'Algonauts full_track analysis FLOW'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -231,6 +231,10 @@ class LitModel(LightningModule):
                 out_vid = outs
             elif self.hparams.backbone_type == 'i3d_rgb':
                 out_vid = self.backbone(x_vid)
+            elif self.hparams.backbone_type == 'i3d_flow':
+                out_vid = self.backbone(x_vid)
+            else:
+                NotImplementedError()
         else:
             out_vid = x
 
@@ -470,8 +474,8 @@ def train(args, voxel_idxs=None, level: str = ''):
     # if voxel_idxs is not None:
     #     assert args.track == 'full_track' and args.rois == 'WB' and len(level) > 0 and args.save_checkpoints
 
-    if args.backbone_type == 'i3d_flow':
-        assert args.load_from_np
+    # if args.backbone_type == 'i3d_flow':
+    #     assert args.load_from_np
 
     dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
                              num_frames=args.video_frames, resolution=args.video_size, track=args.track,
@@ -638,6 +642,7 @@ def parse_args():
     parser.add_argument('--accumulate_grad_batches', type=int, default=1)
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--datasets_dir', type=str, default='/home/huze/algonauts_datasets/')
+    parser.add_argument('--flow_dir', type=str, default='/home/huze/algonauts_datasets/flows/my/') # TODO: hard-coded in dataloading.py
     parser.add_argument('--bdcn_path', type=str,
                         default='/home/huze/algonauts_datasets/models/bdcn_pretrained_on_bsds500.pth')
     parser.add_argument('--i3d_flow_path', type=str,
