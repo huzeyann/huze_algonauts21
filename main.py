@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts full_track analysis FLOW'
+PROJECT_NAME = 'Algonauts full_track analysis EDGE'
 
 task = Task.init(
     project_name=PROJECT_NAME,
