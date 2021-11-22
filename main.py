@@ -32,21 +32,20 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts full_track analysis EDGE'
+PROJECT_NAME = 'debug'
 
-task = Task.init(
-    project_name=PROJECT_NAME,
-    task_name='task template',
-    tags=None,
-    reuse_last_task_id=False,
-    continue_last_task=False,
-    output_uri=None,
-    auto_connect_arg_parser=True,
-    auto_connect_frameworks=True,
-    auto_resource_monitoring=True,
-    auto_connect_streams=True,
-)
-
+# task = Task.init(
+#     project_name=PROJECT_NAME,
+#     task_name='task template',
+#     tags=None,
+#     reuse_last_task_id=False,
+#     continue_last_task=False,
+#     output_uri=None,
+#     auto_connect_arg_parser=True,
+#     auto_connect_frameworks=True,
+#     auto_resource_monitoring=True,
+#     auto_connect_streams=True,
+# )
 
 class DataAugmentation(nn.Module):
     """Module to perform data augmentation using Kornia on torch tensors."""
@@ -736,4 +735,5 @@ def main():
 
 
 if __name__ == '__main__':
+
     main()

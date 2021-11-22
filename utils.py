@@ -270,3 +270,9 @@ def save_fn_np(arr, save_dir, file_name):
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
     np.save(os.path.join(save_dir, file_name), arr)
+
+
+def load_categories(filename):
+    """Load categories."""
+    with open(filename) as f:
+        return [line.rstrip() for line in f.readlines()]
