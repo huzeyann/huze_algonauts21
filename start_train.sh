@@ -40,3 +40,17 @@ python main.py --cached --use_cv --old_mix --final_fusion concat \
 --spp \
 --spp_size 3 6 9 \
 --debug
+
+python main.py --cached --use_cv --old_mix --final_fusion concat \
+--backbone_type i3d_rgb \
+--preprocessing_type mmit \
+--video_size 288 \
+--video_frames 16 \
+--predictions_dir /tmp \
+--track mini_track \
+--rois V1 \
+--backbone_lr_ratio 0.5 \
+--backbone_freeze_epochs 4 \
+--spp \
+--spp_size 3 6 9 \
+--debug
