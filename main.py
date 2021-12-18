@@ -210,34 +210,34 @@ class LitModel(LightningModule):
                 s = x_vid.shape
                 x_vid = x_vid.reshape(s[0] * s[1], *s[2:])
 
-                out_vid = self.backbone(x_vid)
+                self.out_vid = self.backbone(x_vid)
 
                 # img to vid
-                out_vid = out_vid.reshape(s[0], s[1], s[3], s[4])
+                self.out_vid = self.out_vid.reshape(s[0], s[1], s[3], s[4])
                 if self.training == False:
-                    self.logger.experiment[0].add_image('edges', F.sigmoid(out_vid[0, -1, :, :]),
+                    self.logger.experiment[0].add_image('edges', F.sigmoid(self.out_vid[0, -1, :, :]),
                                                         global_step=self.global_step, dataformats='HW')
-                    # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
+                    # self.logger.experiment.add_scalar(f'edges/max', F.sigmoid(self.out_vid[-1][0, -1, :, :]).max(), global_step=self.global_step)
             elif self.hparams.backbone_type == 'bit':
                 x_vid = x_vid.permute(0, 2, 1, 3, 4)
                 s = x_vid.shape
                 x_vid = x_vid.reshape(s[0] * s[1], *s[2:])
 
                 outs = self.backbone(x_vid)
-                # out_vid = {}
+                # self.out_vid = {}
                 # for x_i, out in outs.items():
-                #     out_vid[x_i] = out.reshape(s[0] * s[1], -1, s[3], s[4]) if x_i != 'x5' else out
-                out_vid = outs
+                #     self.out_vid[x_i] = out.reshape(s[0] * s[1], -1, s[3], s[4]) if x_i != 'x5' else out
+                self.out_vid = outs
             elif self.hparams.backbone_type == 'i3d_rgb':
-                out_vid = self.backbone(x_vid)
+                self.out_vid = self.backbone(x_vid)
             elif self.hparams.backbone_type == 'i3d_flow':
-                out_vid = self.backbone(x_vid)
+                self.out_vid = self.backbone(x_vid)
             else:
                 NotImplementedError()
         else:
-            out_vid = x
+            self.out_vid = x
 
-        out = self.neck(out_vid)
+        out = self.neck(self.out_vid)
 
         if self.hparams.track == 'full_track':
             out, out_aux = out

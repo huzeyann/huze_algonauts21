@@ -34,6 +34,7 @@ def disable_bn(model):
         if isinstance(module, nn.BatchNorm3d):
             module.eval()
 
+
 def vectorized_correlation(x, y):
     dim = 0
 
@@ -51,14 +52,16 @@ def vectorized_correlation(x, y):
 
     return corr.ravel()
 
+
 def dokodemo_hsplit(x, idxs):
     ret = []
     for i in range(len(idxs)):
         if i == 0:
             ret.append(x[:, :idxs[i]])
         else:
-            ret.append(x[:, idxs[i-1]:idxs[i]])
+            ret.append(x[:, idxs[i - 1]:idxs[i]])
     return ret
+
 
 def roi_correlation(x, y, roi_keys, roi_idx):
     xx = hsplit(x, roi_idx)
@@ -217,6 +220,7 @@ def load_fmri(base_fmri_dir, rois, subs):
 
     return all_fmri, keys, idx_ends, lens
 
+
 def load_fmri_wb(base_fmri_dir, roi, subs):
     # rois = ['WB']
     # subs = ['sub01', 'sub02', 'sub03', 'sub04', 'sub05', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10']
@@ -276,3 +280,40 @@ def load_categories(filename):
     """Load categories."""
     with open(filename) as f:
         return [line.rstrip() for line in f.readlines()]
+
+
+def save_video(rgb_vid, video_path, fps=5):
+    import cv2
+
+    image_folder = '/tmp/frames/'
+    os.makedirs(image_folder, exist_ok=True)
+
+    for i in range(rgb_vid.shape[0]):
+        im = Image.fromarray(rgb_vid[i])
+        im.save(f"/tmp/frames/{i}.png")
+
+    images = [img for img in os.listdir(image_folder) if img.endswith(".png")]
+    frame = cv2.imread(os.path.join(image_folder, images[0]))
+    height, width, layers = frame.shape
+
+    video = cv2.VideoWriter(video_path, 0, fps, (width, height))
+
+    for image in images:
+        video.write(cv2.imread(os.path.join(image_folder, image)))
+
+    cv2.destroyAllWindows()
+    video.release()
+
+
+def reject_outliers(data, m=2):
+    new_data = np.zeros(data.shape)
+    idx = abs(data - np.mean(data)) < m * np.std(data)
+    new_data[idx] = data[idx]
+    return new_data
+
+
+def reject_outliers_torch(data, m=2):
+    new_data = torch.zeros(data.shape, device=data.device)
+    idx = abs(data - torch.mean(data)) < m * torch.std(data)
+    new_data[idx] = data[idx]
+    return new_data
