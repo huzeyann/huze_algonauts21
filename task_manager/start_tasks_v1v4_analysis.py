@@ -101,8 +101,19 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, batch_size=32):
 
                         task_ids.append(cloned_task.id)
 
+# start_tasks_spp(
+#     rois=['V1', 'V2', 'V3', 'V4'],
+#     layers=['x3'],
+#     ps=[
+#         [3, 6, 9],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     batch_size=24
+# )
+
 start_tasks_spp(
-    rois=['V1', 'V2', 'V3', 'V4'],
+    rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
     layers=['x3'],
     ps=[
         [3, 6, 9],

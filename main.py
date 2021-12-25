@@ -538,11 +538,11 @@ def train(args, voxel_idxs=None, level: str = ''):
         torch.set_printoptions(10)
 
     if args.backbone_type == 'i3d_rgb':
-        backbone = modify_resnets_patrial_x_all(multi_resnet3d50(cache_dir=args.i3d_rgb_dir))
+        backbone = modify_resnets_patrial_x_all(multi_resnet3d50(cache_dir=args.i3d_rgb_dir, pretrained=args.pretrained))
     elif args.backbone_type == 'bdcn_edge':
-        backbone = load_bdcn(args.bdcn_path)
+        backbone = load_bdcn(args.bdcn_path, pretrained=args.pretrained)
     elif args.backbone_type == 'i3d_flow':
-        backbone = load_i3d_flow(args.i3d_flow_path)
+        backbone = load_i3d_flow(args.i3d_flow_path, pretrained=args.pretrained)
     elif args.backbone_type == 'vggish':
         backbone = nn.Module()
     elif args.backbone_type == 'bit':
@@ -669,6 +669,7 @@ def parse_args():
     parser.add_argument('--save_checkpoints', default=False, action="store_true")
     parser.add_argument('--use_cv', default=False, action="store_true")
     parser.add_argument('--fold', type=int, default=-1)
+    parser.add_argument('--pretrained', default=False, action="store_true")
     parser.add_argument('--preprocessing_type', type=str, default='mmit', help='mmit, bdcn, i3d_flow, bit')
     parser.add_argument('--early_stop_epochs', type=int, default=10)
     parser.add_argument('--cached', default=False, action="store_true")

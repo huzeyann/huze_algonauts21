@@ -206,9 +206,10 @@ class BDCN(nn.Module):
                     param.normal_(0, 0.01)
         # print self.conv1_1_down.weight
 
-def load_bdcn(path):
+def load_bdcn(path, pretrained=True):
     model = BDCN()
-    model.load_state_dict(torch.load(path))
+    if pretrained:
+        model.load_state_dict(torch.load(path))
     return model
 
 if __name__ == '__main__':

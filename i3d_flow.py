@@ -431,7 +431,8 @@ def load_mixed(state_dict, name_pt, sess, name_tf, fix_typo=False):
                 os.path.join(name_tf, 'Branch_3/Conv3d_0b_1x1'))
 
 
-def load_i3d_flow(path):
+def load_i3d_flow(path, pretrained=True):
     model = I3D(num_classes=400, modality='flow')
-    model.load_state_dict(torch.load(path))
+    if pretrained:
+        model.load_state_dict(torch.load(path))
     return model
