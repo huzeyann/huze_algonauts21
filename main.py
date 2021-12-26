@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts V1V4 analysis'
+PROJECT_NAME = 'FT gradients about training'
 
 task = Task.init(
     project_name=PROJECT_NAME,

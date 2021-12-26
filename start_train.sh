@@ -9,6 +9,7 @@ python main.py --cached --use_cv --fp16 --old_mix --final_fusion concat \
 --rois WB \
 --backbone_lr_ratio 0.5 \
 --backbone_freeze_epochs 4 \
+--pretrain \
 --debug
 
 
