@@ -3,13 +3,19 @@ python main.py --cached --use_cv --save_checkpoints --fp16 --old_mix --final_fus
 python main.py --cached --use_cv --fp16 --old_mix --final_fusion concat \
 --i3d_flow_path /home/huze/i3d_flow.pt \
 --backbone_type i3d_flow \
+--video_frames 48 \
+--video_size 256 \
+--crop_size 224 \
+--cached \
 --preprocessing_type i3d_flow \
 --predictions_dir /tmp \
---track full_track \
---rois WB \
+--track mini_track \
+--rois V1,V2,V3,V4 \
 --backbone_lr_ratio 0.5 \
 --backbone_freeze_epochs 4 \
---pretrain \
+--pyramid_layers x3 \
+--x3_pooling_mode no \
+--pretrained \
 --debug
 
 

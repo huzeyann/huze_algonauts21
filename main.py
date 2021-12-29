@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'FT gradients about training'
+PROJECT_NAME = 'Algonauts V1V4 adding frames'
 
 task = Task.init(
     project_name=PROJECT_NAME,
@@ -231,6 +231,7 @@ class LitModel(LightningModule):
             elif self.hparams.backbone_type == 'i3d_rgb':
                 self.out_vid = self.backbone(x_vid)
             elif self.hparams.backbone_type == 'i3d_flow':
+                # print(x_vid.shape)
                 self.out_vid = self.backbone(x_vid)
             else:
                 NotImplementedError()

@@ -404,19 +404,31 @@ class I3d_neck(nn.Module):
     def __init__(self, hparams):
         super(I3d_neck, self).__init__()
         self.hparams = hparams
+
+        def roundup(x):
+            return int(np.ceil(x))
+
         if self.hparams.backbone_type == 'i3d_rgb':
             video_size = hparams['video_size'] if hparams['crop_size'] == 0 else hparams['crop_size']
-            self.x1_twh = (int(hparams['video_frames'] / 2), int(video_size / 4), int(video_size / 4))
-            self.x2_twh = tuple(map(lambda x: int(x / 2), self.x1_twh))
-            self.x3_twh = tuple(map(lambda x: int(x / 2), self.x2_twh))
-            self.x4_twh = tuple(map(lambda x: int(x / 2), self.x3_twh))
+            self.x1_twh = (roundup(hparams['video_frames'] / 2), roundup(video_size / 4), roundup(video_size / 4))
+            self.x2_twh = tuple(map(lambda x: roundup(x / 2), self.x1_twh))
+            self.x3_twh = tuple(map(lambda x: roundup(x / 2), self.x2_twh))
+            self.x4_twh = tuple(map(lambda x: roundup(x / 2), self.x3_twh))
             self.x1_c, self.x2_c, self.x3_c, self.x4_c = 256, 512, 1024, 2048
         elif self.hparams.backbone_type == 'i3d_flow':
             # assert self.hparams.load_from_np
-            self.x1_twh = (32, 28, 28)
-            self.x2_twh = (16, 14, 14)
-            self.x3_twh = (8, 7, 7)
-            self.x4_twh = (8, 7, 7)
+            # self.x1_twh = (32, 28, 28)
+            # self.x2_twh = (16, 14, 14)
+            # self.x3_twh = (8, 7, 7)
+            # self.x4_twh = (8, 7, 7)
+            video_frames = hparams['video_frames']
+            video_size = hparams['video_size'] if hparams['crop_size'] == 0 else hparams['crop_size']
+            print(video_size)
+            self.x1_twh = (roundup(video_frames / 2), roundup(video_size / 8), roundup(video_size / 8))
+            self.x2_twh = (roundup(self.x1_twh[0] / 2), roundup(self.x1_twh[1] / 2), roundup(self.x1_twh[2] / 2))
+            self.x3_twh = (roundup(self.x2_twh[0] / 2), roundup(self.x2_twh[1] / 2), roundup(self.x2_twh[2] / 2))
+            print(self.x3_twh)
+            self.x4_twh = (roundup(self.x2_twh[0] / 2), roundup(self.x2_twh[1] / 2), roundup(self.x2_twh[2] / 2))
             self.x1_c, self.x2_c, self.x3_c, self.x4_c = 192, 480, 832, 1024
         else:
             NotImplementedError()

@@ -287,6 +287,7 @@ class AlgonautsDataset(Dataset):
             # load on call
             self.np_paths = [os.path.join(self.flow_dir, os.path.basename(f).replace('.mp4', '_flow_raft.npy'))
                              for f in self.vid_file_list]
+            self.frame_idxs = np.linspace(0, 64-1, self.num_frames).astype('int')
 
 
         # load fmri
@@ -316,7 +317,10 @@ class AlgonautsDataset(Dataset):
 
     def __getitem__(self, index):
 
+        # print(self.np_paths[index])
         vid = np.load(self.np_paths[index])
+        if self.preprocessing_type == 'i3d_flow':
+            vid = vid[:, self.frame_idxs, ...]
 
         x = {'video': vid}
         additional_features = {af: self.features[af][index] for af in self.additional_features}
