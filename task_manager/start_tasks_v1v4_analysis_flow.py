@@ -2,7 +2,7 @@ import itertools
 
 from clearml import Task
 
-PROJECT_NAME = 'Algonauts V1V4 adding frames'
+PROJECT_NAME = 'V1V4 models'
 BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
@@ -107,12 +107,12 @@ def start_tasks_spp(video_sizes, video_frames, rois, layers, ps, freeze_bns, poo
 
 
 def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, pretraineds, batch_size=32):
-    for video_size in video_sizes:
-        for video_frame in video_frames:
-            for roi in rois:
-                for layer in layers:
-                    for freeze_bn in freeze_bns:
-                        for pretrained in pretraineds:
+    for pretrained in pretraineds:
+        for video_size in video_sizes:
+            for video_frame in video_frames:
+                for roi in rois:
+                    for layer in layers:
+                        for freeze_bn in freeze_bns:
                             queue = next(queues_buffer)
 
                             freeze_text = 'f_bn' if freeze_bn else 'nof_bn'
@@ -136,7 +136,7 @@ def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, 
                             cloned_task_parameters['Args/load_from_np'] = False
                             cloned_task_parameters['Args/learning_rate'] = 1e-4
                             cloned_task_parameters['Args/step_lr_epochs'] = [4]
-                            cloned_task_parameters['Args/step_lr_ratio'] = 0.7
+                            cloned_task_parameters['Args/step_lr_ratio'] = 0.7 if pretrained else 0.95 # 0.7
                             cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 8
                             cloned_task_parameters['Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
                                 batch_size / 8)
@@ -149,10 +149,10 @@ def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, 
                             cloned_task_parameters['Args/pretrained'] = pretrained
                             cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                             cloned_task_parameters['Args/old_mix'] = True
-                            cloned_task_parameters['Args/early_stop_epochs'] = 5
+                            cloned_task_parameters['Args/early_stop_epochs'] = 5 if pretrained else 10 # 5
                             cloned_task_parameters['Args/max_epochs'] = 100
-                            cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5
-                            cloned_task_parameters['Args/backbone_freeze_epochs'] = 4
+                            cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5 if pretrained else 1.0
+                            cloned_task_parameters['Args/backbone_freeze_epochs'] = 4 if pretrained else 0
                             cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
                             for l in layer.split(','):
                                 cloned_task_parameters[f'Args/{l}_pooling_mode'] = 'no'
@@ -212,14 +212,25 @@ def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, 
 #     batch_size=24
 # )
 
-start_tasks_no_pooling(
-    rois=['V1,V2,V3,V4'],
-    video_sizes=[256],
-    video_frames=[16, 32, 48, 64],
-    layers=['x3'],
-    freeze_bns=[True],
-    pretraineds=[True, False],
-    batch_size=24
-)
+# start_tasks_no_pooling(
+#     rois=['V1,V2,V3,V4'],
+#     video_sizes=[256],
+#     video_frames=[16, 32, 48, 64],
+#     layers=['x3'],
+#     freeze_bns=[True],
+#     pretraineds=[True, False],
+#     batch_size=24
+# )
+
+for i in range(3):
+    start_tasks_no_pooling(
+        rois=['V1,V2,V3,V4'],
+        video_sizes=[256],
+        video_frames=[64],
+        layers=['x3'],
+        freeze_bns=[True],
+        pretraineds=[True],
+        batch_size=24
+    )
 
 print(task_ids)
