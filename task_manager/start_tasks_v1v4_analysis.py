@@ -111,11 +111,9 @@ def start_tasks_no_pooling(rois, layers, freeze_bns, pooling_modes, pretraineds,
                         assert pooling_mode in ['no']
                         queue = next(queues_buffer)
 
-                        p_text = '-'.join([str(i) for i in p])
                         freeze_text = 'f_bn' if freeze_bn else 'nof_bn'
-                        pooling_text = f'spp_{p_text}_{pooling_mode}'
 
-                        tags = [roi, layer, pooling_text, freeze_text]
+                        tags = [roi, layer, freeze_text]
                         cloned_task = Task.clone(source_task=template_task,
                                                  name=','.join(tags),
                                                  parent=template_task.id)
@@ -202,7 +200,7 @@ for i in range(3):
         rois=['V1,V2,V3,V4'],
         layers=['x3'],
         freeze_bns=[True],
-        pooling_modes=['avg'],
+        pooling_modes=['no'],
         pretraineds=[True],
         batch_size=24
     )

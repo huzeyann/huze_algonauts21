@@ -26,12 +26,13 @@ queues_buffer = itertools.cycle(queue_names)
 task_ids = []
 
 
-def start_tasks_spp(video_sizes, video_frames, rois, layers, ps, freeze_bns, pooling_modes, pretraineds, batch_size=32):
+def start_tasks_spp(video_sizes, video_frames, rois, layers, ps, ts, freeze_bns, pooling_modes, pretraineds,
+                    batch_size=32):
     for video_size in video_sizes:
         for video_frame in video_frames:
             for roi in rois:
                 for layer in layers:
-                    for p in ps:
+                    for p, t in zip(ps, ts):
                         for freeze_bn in freeze_bns:
                             for pooling_mode in pooling_modes:
                                 for pretrained in pretraineds:
@@ -53,8 +54,8 @@ def start_tasks_spp(video_sizes, video_frames, rois, layers, ps, freeze_bns, poo
                                     # cloned_task_parameters['rois'] = [roi]
                                     cloned_task_parameters['Args/rois'] = roi
                                     cloned_task_parameters['Args/track'] = 'mini_track'
-                                    cloned_task_parameters['Args/video_size'] = video_size # 256
-                                    cloned_task_parameters['Args/crop_size'] = int(0.875 * video_size) # 224
+                                    cloned_task_parameters['Args/video_size'] = video_size  # 256
+                                    cloned_task_parameters['Args/crop_size'] = int(0.875 * video_size)  # 224
                                     cloned_task_parameters['Args/video_frames'] = video_frame
                                     cloned_task_parameters['Args/backbone_type'] = 'i3d_flow'
                                     cloned_task_parameters['Args/preprocessing_type'] = 'i3d_flow'
@@ -63,7 +64,8 @@ def start_tasks_spp(video_sizes, video_frames, rois, layers, ps, freeze_bns, poo
                                     cloned_task_parameters['Args/step_lr_epochs'] = [4]
                                     cloned_task_parameters['Args/step_lr_ratio'] = 0.7
                                     cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 8
-                                    cloned_task_parameters['Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
+                                    cloned_task_parameters[
+                                        'Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
                                         batch_size / 8)
                                     cloned_task_parameters['Args/num_layers'] = 1
                                     cloned_task_parameters['Args/conv_size'] = 256
@@ -83,7 +85,7 @@ def start_tasks_spp(video_sizes, video_frames, rois, layers, ps, freeze_bns, poo
                                     for l in layer.split(','):
                                         cloned_task_parameters[f'Args/{l}_pooling_mode'] = 'spp'
                                         cloned_task_parameters[f'Args/spp_size_{l}'] = p
-                                        cloned_task_parameters[f'Args/spp_size_t_{l}'] = [1 for _ in p]
+                                        cloned_task_parameters[f'Args/spp_size_t_{l}'] = t
                                     cloned_task_parameters['Args/backbone_type'] = 'i3d_flow'
                                     cloned_task_parameters['Args/final_fusion'] = 'concat'
                                     cloned_task_parameters['Args/pyramid_layers'] = layer
@@ -128,15 +130,15 @@ def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, 
                             # cloned_task_parameters['rois'] = [roi]
                             cloned_task_parameters['Args/rois'] = roi
                             cloned_task_parameters['Args/track'] = 'mini_track'
-                            cloned_task_parameters['Args/video_size'] = video_size # 256
-                            cloned_task_parameters['Args/crop_size'] = int(0.875 * video_size) # 224
+                            cloned_task_parameters['Args/video_size'] = video_size  # 256
+                            cloned_task_parameters['Args/crop_size'] = int(0.875 * video_size)  # 224
                             cloned_task_parameters['Args/video_frames'] = video_frame
                             cloned_task_parameters['Args/backbone_type'] = 'i3d_flow'
                             cloned_task_parameters['Args/preprocessing_type'] = 'i3d_flow'
                             cloned_task_parameters['Args/load_from_np'] = False
                             cloned_task_parameters['Args/learning_rate'] = 1e-4
                             cloned_task_parameters['Args/step_lr_epochs'] = [4]
-                            cloned_task_parameters['Args/step_lr_ratio'] = 0.7 if pretrained else 0.95 # 0.7
+                            cloned_task_parameters['Args/step_lr_ratio'] = 0.7 if pretrained else 0.95  # 0.7
                             cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 8
                             cloned_task_parameters['Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
                                 batch_size / 8)
@@ -149,7 +151,7 @@ def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, 
                             cloned_task_parameters['Args/pretrained'] = pretrained
                             cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                             cloned_task_parameters['Args/old_mix'] = True
-                            cloned_task_parameters['Args/early_stop_epochs'] = 5 if pretrained else 10 # 5
+                            cloned_task_parameters['Args/early_stop_epochs'] = 5 if pretrained else 10  # 5
                             cloned_task_parameters['Args/max_epochs'] = 100
                             cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5 if pretrained else 1.0
                             cloned_task_parameters['Args/backbone_freeze_epochs'] = 4 if pretrained else 0
@@ -176,6 +178,7 @@ def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, 
                             print('Experiment id={} enqueue for execution'.format(cloned_task.id))
 
                             task_ids.append(cloned_task.id)
+
 
 # start_tasks_spp(
 #     rois=['EBA', 'LOC', 'PPA', 'FFA', 'STS'],
@@ -222,15 +225,110 @@ def start_tasks_no_pooling(video_sizes, video_frames, rois, layers, freeze_bns, 
 #     batch_size=24
 # )
 
-for i in range(3):
-    start_tasks_no_pooling(
-        rois=['V1,V2,V3,V4'],
-        video_sizes=[256],
-        video_frames=[64],
-        layers=['x3'],
-        freeze_bns=[True],
-        pretraineds=[True],
-        batch_size=24
-    )
+# for i in range(3):
+#     start_tasks_no_pooling(
+#         rois=['V1,V2,V3,V4'],
+#         video_sizes=[256],
+#         video_frames=[64],
+#         layers=['x3'],
+#         freeze_bns=[True],
+#         pretraineds=[True],
+#         batch_size=24
+#     )
+
+
+start_tasks_spp(
+    rois=['V1,V2,V3,V4'],
+    video_sizes=[256],
+    video_frames=[64],
+    ps=[
+        [5],
+        [5],
+        [5],
+        [5],
+    ],
+    ts=[
+        [2],
+        [4],
+        [6],
+        [8],
+    ],
+    pooling_modes=['avg'],
+    layers=['x4'],
+    freeze_bns=[True],
+    pretraineds=[True],
+    batch_size=24
+)
+
+start_tasks_spp(
+    rois=['V1,V2,V3,V4'],
+    video_sizes=[256],
+    video_frames=[64],
+    ps=[
+        [5],
+        [5],
+        [5],
+        [5],
+    ],
+    ts=[
+        [2],
+        [4],
+        [6],
+        [8],
+    ],
+    pooling_modes=['avg'],
+    layers=['x3'],
+    freeze_bns=[True],
+    pretraineds=[True],
+    batch_size=24
+)
+
+start_tasks_spp(
+    rois=['V1,V2,V3,V4'],
+    video_sizes=[256],
+    video_frames=[64],
+    ps=[
+        [5],
+        [5],
+        [5],
+        [5],
+    ],
+    ts=[
+        [2],
+        [4],
+        [8],
+        [16],
+    ],
+    pooling_modes=['avg'],
+    layers=['x2'],
+    freeze_bns=[True],
+    pretraineds=[True],
+    batch_size=24
+)
+
+start_tasks_spp(
+    rois=['V1,V2,V3,V4'],
+    video_sizes=[256],
+    video_frames=[64],
+    ps=[
+        [5],
+        [5],
+        [5],
+        [5],
+        [5],
+    ],
+    ts=[
+        [2],
+        [4],
+        [8],
+        [16],
+        [32],
+    ],
+    pooling_modes=['avg'],
+    layers=['x1'],
+    freeze_bns=[True],
+    pretraineds=[True],
+    batch_size=24
+)
 
 print(task_ids)

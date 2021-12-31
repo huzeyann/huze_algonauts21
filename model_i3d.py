@@ -423,11 +423,11 @@ class I3d_neck(nn.Module):
             # self.x4_twh = (8, 7, 7)
             video_frames = hparams['video_frames']
             video_size = hparams['video_size'] if hparams['crop_size'] == 0 else hparams['crop_size']
-            print(video_size)
+            # print(video_size)
             self.x1_twh = (roundup(video_frames / 2), roundup(video_size / 8), roundup(video_size / 8))
             self.x2_twh = (roundup(self.x1_twh[0] / 2), roundup(self.x1_twh[1] / 2), roundup(self.x1_twh[2] / 2))
             self.x3_twh = (roundup(self.x2_twh[0] / 2), roundup(self.x2_twh[1] / 2), roundup(self.x2_twh[2] / 2))
-            print(self.x3_twh)
+            # print(self.x3_twh)
             self.x4_twh = (roundup(self.x2_twh[0] / 2), roundup(self.x2_twh[1] / 2), roundup(self.x2_twh[2] / 2))
             self.x1_c, self.x2_c, self.x3_c, self.x4_c = 192, 480, 832, 1024
         else:
