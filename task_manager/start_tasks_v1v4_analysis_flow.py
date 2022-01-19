@@ -39,7 +39,7 @@ def start_tasks_spp(video_sizes, video_frames, rois, layers, ps, ts, freeze_bns,
                                     assert pooling_mode in ['max', 'avg']
                                     queue = next(queues_buffer)
 
-                                    p_text = '-'.join([str(i) for i in p])
+                                    p_text = '-'.join([str(i) for i in p]) + '_' + '-'.join([str(i) for i in t])
                                     freeze_text = 'f_bn' if freeze_bn else 'nof_bn'
                                     pooling_text = f'spp_{p_text}_{pooling_mode}'
 
@@ -243,38 +243,15 @@ start_tasks_spp(
     video_frames=[64],
     ps=[
         [5],
-        [5],
-        [5],
-        [5],
-    ],
-    ts=[
-        [2],
         [4],
         [6],
-        [8],
-    ],
-    pooling_modes=['avg'],
-    layers=['x4'],
-    freeze_bns=[True],
-    pretraineds=[True],
-    batch_size=24
-)
-
-start_tasks_spp(
-    rois=['V1,V2,V3,V4'],
-    video_sizes=[256],
-    video_frames=[64],
-    ps=[
-        [5],
-        [5],
-        [5],
-        [5],
+        [7],
     ],
     ts=[
+        [1],
         [2],
-        [4],
-        [6],
-        [8],
+        [2],
+        [2],
     ],
     pooling_modes=['avg'],
     layers=['x3'],
@@ -283,52 +260,6 @@ start_tasks_spp(
     batch_size=24
 )
 
-start_tasks_spp(
-    rois=['V1,V2,V3,V4'],
-    video_sizes=[256],
-    video_frames=[64],
-    ps=[
-        [5],
-        [5],
-        [5],
-        [5],
-    ],
-    ts=[
-        [2],
-        [4],
-        [8],
-        [16],
-    ],
-    pooling_modes=['avg'],
-    layers=['x2'],
-    freeze_bns=[True],
-    pretraineds=[True],
-    batch_size=24
-)
 
-start_tasks_spp(
-    rois=['V1,V2,V3,V4'],
-    video_sizes=[256],
-    video_frames=[64],
-    ps=[
-        [5],
-        [5],
-        [5],
-        [5],
-        [5],
-    ],
-    ts=[
-        [2],
-        [4],
-        [8],
-        [16],
-        [32],
-    ],
-    pooling_modes=['avg'],
-    layers=['x1'],
-    freeze_bns=[True],
-    pretraineds=[True],
-    batch_size=24
-)
 
 print(task_ids)

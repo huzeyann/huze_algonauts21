@@ -3,7 +3,7 @@ python main.py --cached --use_cv --save_checkpoints --fp16 --old_mix --final_fus
 python main.py --cached --use_cv --fp16 --old_mix --final_fusion concat \
 --i3d_flow_path /home/huze/i3d_flow.pt \
 --backbone_type i3d_flow \
---video_frames 48 \
+--video_frames 64 \
 --video_size 256 \
 --crop_size 224 \
 --cached \
