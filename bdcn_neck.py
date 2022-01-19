@@ -20,6 +20,8 @@ class BDCNNeck(nn.Module):
 
         self.pool_size = self.hparams.pooling_size
 
+        self.is_lstm = True if self.hparams.lstm_layers > 0 else False
+
         if self.hparams.spp:
             levels = np.array(hparams['spp_size'])
             pool = SpatialPyramidPooling2D(
@@ -43,26 +45,45 @@ class BDCNNeck(nn.Module):
             pool,
         )
 
-        self.lstm = nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
-                            num_layers=self.hparams.lstm_layers, batch_first=True)
-        if self.hparams['track'] == 'full_track':
-            if self.hparams['no_convtrans']:
-                self.head = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames,
-                                     hparams['output_size'])
+        if self.is_lstm:
+            self.lstm = nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
+                                num_layers=self.hparams.lstm_layers, batch_first=True)
+            if self.hparams['track'] == 'full_track':
+                if self.hparams['no_convtrans']:
+                    self.head = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames,
+                                         hparams['output_size'])
+                else:
+                    self.head = ConvResponseModel(self.hparams.layer_hidden * self.hparams.video_frames,
+                                                  hparams['num_subs'], hparams)
             else:
-                self.head = ConvResponseModel(self.hparams.layer_hidden * self.hparams.video_frames,
-                                              hparams['num_subs'], hparams)
+                self.head = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames,
+                                   hparams['output_size'])
         else:
-            self.head = build_fc(hparams, self.hparams.layer_hidden * self.hparams.video_frames,
-                               hparams['output_size'])
-
+            if self.hparams['track'] == 'full_track':
+                if self.hparams['no_convtrans']:
+                    self.head = build_fc(hparams, in_dim,
+                                         hparams['output_size'])
+                else:
+                    self.head = ConvResponseModel(in_dim,
+                                                  hparams['num_subs'], hparams)
+            else:
+                self.head = build_fc(hparams, in_dim,
+                                   hparams['output_size'])
     def forward(self, x):
         # x: (None, D, H, W)
         x = self.read_out_layers(x)
+        # print(x.shape) torch.Size([24, 4, 16, 16])
         x = x.reshape(x.shape[0], x.shape[1], -1)
-        x = self.lstm(x)[0]
-        # print(x.shape)
-        out = self.head(x.reshape(x.shape[0], -1))
+        if self.is_lstm:
+            x = self.lstm(x)[0]
+            out = self.head(x.reshape(x.shape[0], -1))
+        else:
+            s = x.shape
+            # x = x.reshape(s[0]*s[1], -1)
+            x = self.head(x)
+            # x = x.reshape(s[0], s[1], *(x.shape[1:]))
+            print(x.shape)
+            out = x.mean(1) # baseline methods
         out_aux = None
         out = {self.rois: out}
         return out, out_aux

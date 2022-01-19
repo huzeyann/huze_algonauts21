@@ -63,7 +63,10 @@ class BitNeck(nn.Module):
         self.roi = self.rois[0]
         output_size = self.output_sizes[0]
 
+        self.is_lstm = True if self.hparams.lstm_layers > 0 else False
+
         if self.layer == 'x5':
+            assert  self.is_lstm
             if self.hparams.track == 'mini_track':
                 self.head = nn.Sequential(
                     nn.LSTM(input_size=self.x5_dim, hidden_size=self.hparams.layer_hidden,
@@ -117,16 +120,7 @@ class BitNeck(nn.Module):
             )
 
             if self.hparams.track == 'mini_track':
-                self.head = nn.Sequential(
-                    nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
-                            num_layers=self.hparams.lstm_layers, batch_first=True),
-                    LSTMReadout(),
-                    LSTMReadoutLast(),
-                    nn.Flatten(),
-                    build_fc(hparams, self.hparams.layer_hidden, output_size, part='full')
-                )
-            elif self.hparams.track == 'full_track':
-                if self.hparams.no_convtrans:
+                if self.is_lstm:
                     self.head = nn.Sequential(
                         nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
                                 num_layers=self.hparams.lstm_layers, batch_first=True),
@@ -136,14 +130,33 @@ class BitNeck(nn.Module):
                         build_fc(hparams, self.hparams.layer_hidden, output_size, part='full')
                     )
                 else:
-                    self.head = nn.Sequential(
-                        nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
-                                num_layers=self.hparams.lstm_layers, batch_first=True),
-                        LSTMReadout(),
-                        LSTMReadoutLast(),
-                        nn.Flatten(),
-                        ConvResponseModel(self.hparams.layer_hidden, output_size, hparams)
-                    )
+                    self.head = build_fc(hparams, in_dim, output_size, part='full')
+            elif self.hparams.track == 'full_track':
+                if self.hparams.no_convtrans:
+                    if self.is_lstm:
+                        self.head = nn.Sequential(
+                            nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
+                                    num_layers=self.hparams.lstm_layers, batch_first=True),
+                            LSTMReadout(),
+                            LSTMReadoutLast(),
+                            nn.Flatten(),
+                            build_fc(hparams, self.hparams.layer_hidden, output_size, part='full')
+                        )
+                    else:
+                        self.head = build_fc(hparams, in_dim, output_size, part='full')
+                else:
+                    if self.is_lstm:
+                        self.head = nn.Sequential(
+                            nn.LSTM(input_size=in_dim, hidden_size=self.hparams.layer_hidden,
+                                    num_layers=self.hparams.lstm_layers, batch_first=True),
+                            LSTMReadout(),
+                            LSTMReadoutLast(),
+                            nn.Flatten(),
+                            ConvResponseModel(self.hparams.layer_hidden, output_size, hparams)
+                        )
+                    else:
+                        self.head = ConvResponseModel(in_dim, output_size, hparams)
+
     def forward(self, x):
         x = x[self.layer]
         s = x.shape
@@ -156,6 +169,8 @@ class BitNeck(nn.Module):
             x = self.neck(x)
             x = x.reshape(int(s[0] / self.num_frames), self.num_frames, -1)
             out = self.head(x)
+            if not self.is_lstm:
+                out = out.mean(1) # baseline methods
         out_aux = None
         out = {self.roi: out}
         return out, out_aux

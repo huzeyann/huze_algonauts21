@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'V1V4 models'
+PROJECT_NAME = 'Algonauts exensemble full track'
 
 if __name__ == '__main__':
     task = Task.init(
@@ -172,8 +172,8 @@ class LitModel(LightningModule):
         parser.add_argument('--pyramid_layers', type=str, default='x1,x2,x3,x4')
         parser.add_argument('--final_fusion', type=str, default='conv')
         parser.add_argument('--old_mix', default=False, action="store_true")
-        parser.add_argument('--lstm_layers', type=int, default=1)
-        parser.add_argument('--pathways', type=str, default='topdown,bottomup', help="none or topdown,bottomup")
+        parser.add_argument('--lstm_layers', type=int, default=1, help='0 for 2D')
+        parser.add_argument('--pathways', type=str, default='none', help="none or topdown,bottomup")
         parser.add_argument('--aux_loss_weight', type=float, default=0.0)
         parser.add_argument('--aux_loss_weight_x1', type=float, default=0.0)
         parser.add_argument('--aux_loss_weight_x2', type=float, default=-1)
