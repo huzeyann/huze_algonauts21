@@ -14,7 +14,7 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
 available_devices = {
-    '16': [0],
+    '16': [0, 1],
 }
 
 queue_names = []
@@ -61,7 +61,7 @@ def start_tasks_spp_bit(rois, video_sizes, num_frames, ps, freeze_bns, pooling_m
                                         cloned_task_parameters['Args/video_size'] = video_size
                                         cloned_task_parameters['Args/video_frames'] = num_frame
                                         # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
-                                        cloned_task_parameters['Args/learning_rate'] = 1e-4
+                                        cloned_task_parameters['Args/learning_rate'] = 1e-3
                                         cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 8
                                         cloned_task_parameters[
                                             'Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
@@ -71,7 +71,7 @@ def start_tasks_spp_bit(rois, video_sizes, num_frames, ps, freeze_bns, pooling_m
                                         cloned_task_parameters['Args/layer_hidden'] = layer_hidden
                                         cloned_task_parameters['Args/conv_size'] = 256
                                         cloned_task_parameters['Args/debug'] = False
-                                        cloned_task_parameters['Args/fp16'] = True
+                                        cloned_task_parameters['Args/fp16'] = False
                                         cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                                         cloned_task_parameters['Args/early_stop_epochs'] = 10
                                         cloned_task_parameters['Args/backbone_lr_ratio'] = 0.1
@@ -142,7 +142,7 @@ def start_tasks_spp_bdcn(rois, video_sizes, num_frames, ps, freeze_bns, pooling_
                                         cloned_task_parameters['Args/video_size'] = video_size
                                         cloned_task_parameters['Args/video_frames'] = num_frame
                                         # cloned_task_parameters['Args/batch_size'] = 32 if pooling_sch in ['avg', 'max'] else 24
-                                        cloned_task_parameters['Args/learning_rate'] = 1e-4
+                                        cloned_task_parameters['Args/learning_rate'] = 1e-3
                                         cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 8
                                         cloned_task_parameters[
                                             'Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
@@ -152,7 +152,7 @@ def start_tasks_spp_bdcn(rois, video_sizes, num_frames, ps, freeze_bns, pooling_
                                         cloned_task_parameters['Args/layer_hidden'] = layer_hidden
                                         cloned_task_parameters['Args/conv_size'] = 256
                                         cloned_task_parameters['Args/debug'] = False
-                                        cloned_task_parameters['Args/fp16'] = True
+                                        cloned_task_parameters['Args/fp16'] = False
                                         cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                                         cloned_task_parameters['Args/early_stop_epochs'] = 10
                                         cloned_task_parameters['Args/backbone_lr_ratio'] = 0.1
@@ -186,22 +186,49 @@ def start_tasks_spp_bdcn(rois, video_sizes, num_frames, ps, freeze_bns, pooling_
 
                                         task_ids.append(cloned_task.id)
 
+
+# start_tasks_spp_bit(
+#     rois=['WB'],
+#     video_sizes=[224],
+#     num_frames=[4],
+#     ps=[
+#         [5],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     num_lstm_layers=[1],
+#     layer_hiddens=[2048],
+#     layers=['x1'],
+#     batch_size=32,
+# )
+
+# start_tasks_spp_bdcn(
+#     rois=['WB'],
+#     video_sizes=[224],
+#     num_frames=[4],
+#     ps=[
+#         [6, 12, 18],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     num_lstm_layers=[1],
+#     layer_hiddens=[2048],
+#     layers=['x1'],
+#     batch_size=32,
+# )
+
 start_tasks_spp_bit(
     rois=['WB'],
     video_sizes=[224],
     num_frames=[4],
     ps=[
-        [1],
-        [3],
-        [5],
-        [7],
-        [11],
+        [5, 7, 11],
         [1, 3, 5],
         [4, 6, 9],
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
-    num_lstm_layers=[1],
+    num_lstm_layers=[0, 1],
     layer_hiddens=[2048],
     layers=['x1', 'x2', 'x3', 'x4'],
     batch_size=32,
@@ -209,7 +236,7 @@ start_tasks_spp_bit(
 
 start_tasks_spp_bdcn(
     rois=['WB'],
-    video_sizes=[64, 128, 224],
+    video_sizes=[64],
     num_frames=[4],
     ps=[
         [3, 6, 9],
@@ -220,9 +247,9 @@ start_tasks_spp_bdcn(
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
-    num_lstm_layers=[1],
+    num_lstm_layers=[0, 1],
     layer_hiddens=[2048],
-    layers=['iya'],
+    layers=['x1'],
     batch_size=32,
 )
 

@@ -2,7 +2,7 @@ import itertools
 
 from clearml import Task
 
-PROJECT_NAME = 'FT gradients about training'
+PROJECT_NAME = 'ensemble mkii full_track'
 BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
@@ -58,7 +58,7 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                 cloned_task_parameters['Args/backbone_type'] = 'i3d_rgb'
                                 cloned_task_parameters['Args/preprocessing_type'] = 'mmit'
                                 cloned_task_parameters['Args/load_from_np'] = False
-                                cloned_task_parameters['Args/learning_rate'] = 1e-4 # 1e-4
+                                cloned_task_parameters['Args/learning_rate'] = 3e-4 # 1e-4
                                 cloned_task_parameters['Args/step_lr_epochs'] = [10]
                                 cloned_task_parameters['Args/step_lr_ratio'] = 1.0
                                 cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 4
@@ -73,10 +73,10 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                 cloned_task_parameters['Args/pretrained'] = pretraining
                                 cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                                 cloned_task_parameters['Args/old_mix'] = True
-                                cloned_task_parameters['Args/no_convtrans'] = False
-                                cloned_task_parameters['Args/early_stop_epochs'] = 15
+                                cloned_task_parameters['Args/no_convtrans'] = True # TODO False
+                                cloned_task_parameters['Args/early_stop_epochs'] = 5
                                 cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5 if pretraining else 1.0 # 0.5
-                                cloned_task_parameters['Args/backbone_freeze_epochs'] = 10 if pretraining else 0 # TODO 10
+                                cloned_task_parameters['Args/backbone_freeze_epochs'] = 8 if pretraining else 0 # TODO 10
                                 cloned_task_parameters['Args/max_epochs'] = 100
                                 cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
                                 cloned_task_parameters['Args/pooling_mode'] = pooling_mode
@@ -92,7 +92,7 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                 cloned_task_parameters['Args/val_ratio'] = 0.1
                                 cloned_task_parameters['Args/save_checkpoints'] = True
                                 cloned_task_parameters['Args/rm_checkpoints'] = False
-                                cloned_task_parameters['Args/checkpoints_dir'] = '/mnt/huze/checkpoints_flow_mmit/'
+                                cloned_task_parameters['Args/checkpoints_dir'] = '/mnt/huze/ckpts_mkii/'
                                 cloned_task_parameters[
                                     'Args/predictions_dir'] = f'/data_smr/huze/projects/my_algonauts/predictions/'
 
@@ -140,17 +140,38 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
 #     batch_size=24
 # )
 
+# start_tasks_spp(
+#     rois=['WB'],
+#     layers=['x1,x2,x3,x4'],
+#     ps=[
+#         [3, 7, 11],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     pathways=['none'],
+#     pretrainings=[True, False],
+#     batch_size=24,
+# )
+
 start_tasks_spp(
     rois=['WB'],
-    layers=['x1,x2,x3,x4'],
+    layers=['x1', 'x2', 'x3', 'x4'],
     ps=[
-        [3, 7, 11],
+        [1],
+        [2],
+        [3],
+        [4],
+        [5],
+        [6],
+        [7],
+        [8],
+        [9],
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
     pathways=['none'],
-    pretrainings=[True, False],
-    batch_size=24,
+    batch_size=32,
+    pretrainings=[True],
 )
 
 print(task_ids)

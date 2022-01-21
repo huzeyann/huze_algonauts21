@@ -32,7 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'Algonauts exensemble full track'
+PROJECT_NAME = 'ensemble mkii full_track'
 
 if __name__ == '__main__':
     task = Task.init(
@@ -108,7 +108,7 @@ class LitModel(LightningModule):
 
         if self.hparams.track == 'full_track' and not self.hparams.no_convtrans:
             # voxel mask
-            subs = [f'sub{i + 1:02d}' for i in range(10)] if self.hparams.subs == 'all' else self.hparams.subs
+            subs = [f'sub{i + 1:02d}' for i in range(10)] if self.hparams.subs == 'all' else self.hparams.subs.split(',')
             voxel_masks = []
             for sub in subs:
                 voxel_mask = np.load(os.path.join(hparams['datasets_dir'], 'fmris-full', f'{sub}_voxel_mask.npy'))

@@ -29,6 +29,7 @@ python main.py --cached --use_cv --old_mix --final_fusion concat \
 --rois WB \
 --backbone_lr_ratio 0.25 \
 --backbone_freeze_epochs 12 \
+--lstm_layers 0 \
 --spp \
 --spp_size 3 6 9 \
 --debug
@@ -48,16 +49,19 @@ python main.py --cached --use_cv --old_mix --final_fusion concat \
 --spp_size 3 6 9 \
 --debug
 
-python main.py --cached --use_cv --old_mix --final_fusion concat \
+python main.py --cached --fp16 --use_cv --old_mix --final_fusion concat \
 --backbone_type i3d_rgb \
 --preprocessing_type mmit \
 --video_size 288 \
 --video_frames 16 \
 --predictions_dir /tmp \
---track mini_track \
---rois V1 \
+--track full_track \
+--rois WB \
 --backbone_lr_ratio 0.5 \
---backbone_freeze_epochs 4 \
+--backbone_freeze_epochs 8 \
 --spp \
---spp_size 3 6 9 \
+--spp_size 3 \
+--accumulate_grad_batches 4 \
+--batch_size 8 \
+--freeze_bn \
 --debug
