@@ -64,4 +64,9 @@ python main.py --cached --fp16 --use_cv --old_mix --final_fusion concat \
 --accumulate_grad_batches 4 \
 --batch_size 8 \
 --freeze_bn \
+--no_convtrans \
 --debug
+
+clearml-agent daemon --queue 16-0 --detached
+clearml-agent daemon --queue 16-0 --detached
+clearml-agent daemon --stop
