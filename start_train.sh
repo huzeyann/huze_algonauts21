@@ -50,6 +50,7 @@ python main.py --cached --use_cv --old_mix --final_fusion concat \
 --debug
 
 python main.py --cached --fp16 --use_cv --old_mix --final_fusion concat \
+--gpus 1 \
 --backbone_type i3d_rgb \
 --preprocessing_type mmit \
 --video_size 288 \
@@ -68,5 +69,5 @@ python main.py --cached --fp16 --use_cv --old_mix --final_fusion concat \
 --debug
 
 clearml-agent daemon --queue 16-0 --detached
-clearml-agent daemon --queue 16-0 --detached
+clearml-agent daemon --queue 16-1 --detached
 clearml-agent daemon --stop

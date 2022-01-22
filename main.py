@@ -44,7 +44,7 @@ if __name__ == '__main__':
         output_uri=None,
         auto_connect_arg_parser=True,
         auto_connect_frameworks=True,
-        auto_resource_monitoring=False,
+        auto_resource_monitoring=True,
         auto_connect_streams=True,
     )
 

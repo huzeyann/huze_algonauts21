@@ -28,8 +28,8 @@ task_ids = []
 
 def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretrainings, batch_size=32):
     for roi in rois:
-        for layer in layers:
-            for p in ps:
+        for p in ps:
+            for layer in layers:
                 for freeze_bn in freeze_bns:
                     for pooling_mode in pooling_modes:
                         for pathway in pathways:
@@ -74,7 +74,7 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                 cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                                 cloned_task_parameters['Args/old_mix'] = True
                                 cloned_task_parameters['Args/no_convtrans'] = True # TODO False
-                                cloned_task_parameters['Args/early_stop_epochs'] = 5
+                                cloned_task_parameters['Args/early_stop_epochs'] = 10
                                 cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5 if pretraining else 1.0 # 0.5
                                 cloned_task_parameters['Args/backbone_freeze_epochs'] = 8 if pretraining else 0 # TODO 10
                                 cloned_task_parameters['Args/max_epochs'] = 100
@@ -153,19 +153,32 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
 #     batch_size=24,
 # )
 
+# start_tasks_spp(
+#     rois=['WB'],
+#     layers=['x1', 'x2', 'x3', 'x4'],
+#     ps=[
+#         [1],
+#         [2],
+#         [3],
+#         [4],
+#         [5],
+#         [6],
+#         [7],
+#         [8],
+#         [9],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     pathways=['none'],
+#     batch_size=32,
+#     pretrainings=[True],
+# )
+
 start_tasks_spp(
     rois=['WB'],
-    layers=['x1', 'x2', 'x3', 'x4'],
+    layers=['x3', 'x4'],
     ps=[
-        [1],
-        [2],
-        [3],
-        [4],
         [5],
-        [6],
-        [7],
-        [8],
-        [9],
     ],
     freeze_bns=[True],
     pooling_modes=['avg'],
@@ -174,5 +187,33 @@ start_tasks_spp(
     pretrainings=[True],
 )
 
+# start_tasks_spp(
+#     rois=['WB'],
+#     layers=['x3'],
+#     ps=[
+#         [5],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     pathways=['none'],
+#     batch_size=32,
+#     pretrainings=[True],
+# )
+#
+# start_tasks_spp(
+#     rois=['WB'],
+#     layers=['x1', 'x2', 'x3', 'x4'],
+#     ps=[
+#         [6],
+#         [7],
+#         [8],
+#         [9],
+#     ],
+#     freeze_bns=[True],
+#     pooling_modes=['avg'],
+#     pathways=['none'],
+#     batch_size=32,
+#     pretrainings=[True],
+# )
 
 print(task_ids)
