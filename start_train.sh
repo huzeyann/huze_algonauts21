@@ -102,7 +102,8 @@ python main.py --cached --fp16 --use_cv --old_mix --final_fusion concat \
 --no_convtrans \
 --final_fusion concat \
 --rm_checkpoints \
---tag 0.1-WB-3e-4-0.168
+--tag test \
+--debug
 
 clearml-agent daemon --queue 16-0 --detached
 clearml-agent daemon --queue 16-1 --detached

@@ -16,7 +16,7 @@ template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
 score_dict = {'MC2': 0.12,
- 'SMC2': 0.006,
+ 'SMC2': 0.0105,
  'EBA': 0.18,
  'STS': 0.105,
  'V3': 0.15,
@@ -35,7 +35,7 @@ score_dict = {'MC2': 0.12,
  'LC1': 0.027,
  'SC3': 0.135,
  'WB': 0.06,
- 'MC1': 0.006,
+ 'MC1': 0.012,
  'LC2': 0.15}
 
 available_devices = {
@@ -69,7 +69,7 @@ def start_tasks_spp(krois, layers, ps, freeze_bns, pooling_modes,
                                 p_text = '-'.join([str(i) for i in p])
                                 pooling_text = f'{p_text}'
 
-                                tags = [kroi, layer, pooling_text]
+                                tags = ['i3d_rgb', kroi, layer, pooling_text]
                                 cloned_task = Task.clone(source_task=template_task,
                                                          name=','.join(tags),
                                                          parent=template_task.id)
@@ -114,7 +114,7 @@ def start_tasks_spp(krois, layers, ps, freeze_bns, pooling_modes,
                                     cloned_task_parameters[f'Args/{l}_pooling_mode'] = 'spp'
                                     cloned_task_parameters[f'Args/spp_size_{l}'] = p
                                     cloned_task_parameters[f'Args/spp_size_t_{l}'] = [1 for _ in p]
-                                cloned_task_parameters[f'Args/pooling_size'] = p # quick save for 1 layer model
+                                cloned_task_parameters[f'Args/pooling_size'] = p[0] # quick save for 1 layer model
                                 cloned_task_parameters['Args/final_fusion'] = 'concat'
                                 cloned_task_parameters['Args/pyramid_layers'] = layer
                                 cloned_task_parameters['Args/pathways'] = pathway
@@ -154,7 +154,7 @@ def start_tasks_spp_flow(krois, layers, ps, freeze_bns, pooling_modes,
                                 p_text = '-'.join([str(i) for i in p])
                                 pooling_text = f'{p_text}'
 
-                                tags = [kroi, layer, pooling_text]
+                                tags = ['i3d_flow', kroi, layer, pooling_text]
                                 cloned_task = Task.clone(source_task=template_task,
                                                          name=','.join(tags),
                                                          parent=template_task.id)
@@ -199,7 +199,7 @@ def start_tasks_spp_flow(krois, layers, ps, freeze_bns, pooling_modes,
                                     cloned_task_parameters[f'Args/{l}_pooling_mode'] = 'spp'
                                     cloned_task_parameters[f'Args/spp_size_{l}'] = p
                                     cloned_task_parameters[f'Args/spp_size_t_{l}'] = [1 for _ in p]
-                                cloned_task_parameters[f'Args/pooling_size'] = p # quick save for 1 layer model
+                                cloned_task_parameters[f'Args/pooling_size'] = p[0] # quick save for 1 layer model
                                 cloned_task_parameters['Args/final_fusion'] = 'concat'
                                 cloned_task_parameters['Args/pyramid_layers'] = layer
                                 cloned_task_parameters['Args/pathways'] = pathway
@@ -263,7 +263,7 @@ def start_tasks_spp_flow(krois, layers, ps, freeze_bns, pooling_modes,
 # )
 
 start_tasks_spp(
-    krois=['SM2'],
+    krois=['SMC2'],
     layers=['x4'],
     ps=[
         [1],
@@ -275,8 +275,8 @@ start_tasks_spp(
     batch_size=32,
 )
 
-start_tasks_spp(
-    krois=['SM2'],
+start_tasks_spp_flow(
+    krois=['SMC2'],
     layers=['x4'],
     ps=[
         [1],

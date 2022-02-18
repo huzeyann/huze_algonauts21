@@ -402,7 +402,7 @@ class LitModel(LightningModule):
                 return corrs_dict
 
             val_outs = torch.cat([out['out'][self.hparams.rois] for out in val_step_outputs], 0)
-            for roi, corr in roi_correlation(val_outs, val_ys, self.hparams.idx_ends,
+            for roi, corr in roi_correlation(val_outs.to(self.device), val_ys.to(self.device), self.hparams.idx_ends,
                                              self.hparams.rois.split(',')).items():
                 self.log(f'val_corr/{roi}_final', corr, logger=True, sync_dist=False)
                 avg_val_corr.append(corr)
