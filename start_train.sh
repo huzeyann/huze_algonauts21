@@ -51,22 +51,58 @@ python main.py --cached --use_cv --old_mix --final_fusion concat \
 
 python main.py --cached --fp16 --use_cv --old_mix --final_fusion concat \
 --gpus 1 \
+--learning_rate 1e-4 \
+--pretrained \
 --backbone_type i3d_rgb \
 --preprocessing_type mmit \
 --video_size 288 \
 --video_frames 16 \
---predictions_dir /tmp \
+--predictions_dir /data_smr/huze/projects/my_algonauts/predictions/ \
 --track full_track \
 --rois WB \
 --backbone_lr_ratio 0.5 \
---backbone_freeze_epochs 8 \
+--backbone_freeze_epochs 4 \
+--early_stop_epochs 5 \
+--max_epochs 100 \
 --spp \
---spp_size 3 \
+--spp_size 6 \
+--pyramid_layers x3 \
 --accumulate_grad_batches 4 \
 --batch_size 8 \
 --freeze_bn \
+--old_mix \
 --no_convtrans \
---debug
+--final_fusion concat \
+--voxel_index_file /data_smr/huze/projects/my_algonauts/tmp/C5_voxel_indexs.pt \
+--save_checkpoints \
+--rm_checkpoints \
+--checkpoints_dir /mnt/huze/ckpts_mkii/ \
+
+python main.py --cached --fp16 --use_cv --old_mix --final_fusion concat \
+--gpus 1 \
+--learning_rate 3e-4 \
+--pretrained \
+--backbone_type i3d_rgb \
+--preprocessing_type mmit \
+--video_size 288 \
+--video_frames 16 \
+--track full_track \
+--rois WB \
+--backbone_lr_ratio 0.1 \
+--backbone_freeze_score 0.168 \
+--early_stop_epochs 5 \
+--max_epochs 100 \
+--spp \
+--spp_size 9 \
+--pyramid_layers x3 \
+--accumulate_grad_batches 4 \
+--batch_size 8 \
+--freeze_bn \
+--old_mix \
+--no_convtrans \
+--final_fusion concat \
+--rm_checkpoints \
+--tag 0.1-WB-3e-4-0.168
 
 clearml-agent daemon --queue 16-0 --detached
 clearml-agent daemon --queue 16-1 --detached

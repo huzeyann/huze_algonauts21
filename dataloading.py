@@ -84,7 +84,7 @@ def wrap_load_videos(root, file_lists, num_frames=16, resolution=288, preprocess
         NotImplementedError()
 
     vids = []
-    for file in tqdm(file_lists):
+    for file in file_lists:
         vid = load_video(os.path.join(root, file), num_frames, resize_normalize)
         vids.append(vid)
     vids = torch.stack(vids, 0)
@@ -190,8 +190,8 @@ class AlgonautsDatasetFreeze(Dataset):
                     [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir), self.file_df[sub].values)
                      for sub in self.subs])
 
-                if self.voxel_idxs is not None:
-                    self.fmris = self.fmris[:, self.voxel_idxs]
+                # if self.voxel_idxs is not None:
+                #     self.fmris = self.fmris[:, self.voxel_idxs]
 
             if self.track == 'full_track':
                 self.sub_idx_ends = self.idx_ends
@@ -217,7 +217,10 @@ class AlgonautsDatasetFreeze(Dataset):
             NotImplementedError()
 
         if self.train:
-            y = self.fmris[index]
+            if self.voxel_idxs is not None:
+                y = self.fmris[index, self.voxel_idxs]
+            else:
+                y = self.fmris[index]
             return x, y
         else:
             return x
@@ -270,7 +273,7 @@ class AlgonautsDataset(Dataset):
                                                f'{self.resolution}_{self.num_frames}_{self.preprocessing_type}_npy')
                 # save to np
                 os.makedirs(self.cached_dir, exist_ok=True)
-                for file in tqdm(self.vid_file_list):
+                for file in self.vid_file_list:
                     name = os.path.basename(file).replace('.mp4', '.npy')
                     path = os.path.join(self.cached_dir, name)
                     if not os.path.exists(path):
@@ -305,8 +308,8 @@ class AlgonautsDataset(Dataset):
                     [wrap_load_fmris(os.path.join(self.dataset_dir, fmri_dir), self.file_df[sub].values)
                      for sub in self.subs])
 
-                if self.voxel_idxs is not None:
-                    self.fmris = self.fmris[:, self.voxel_idxs]
+                # if self.voxel_idxs is not None:
+                #     self.fmris = self.fmris[:, self.voxel_idxs]
 
             if self.track == 'full_track':
                 self.sub_idx_ends = self.idx_ends
@@ -327,7 +330,10 @@ class AlgonautsDataset(Dataset):
         x.update(additional_features)
 
         if self.train:
-            y = self.fmris[index]
+            if self.voxel_idxs is not None:
+                y = self.fmris[index, self.voxel_idxs]
+            else:
+                y = self.fmris[index]
             return x, y
         else:
             return x

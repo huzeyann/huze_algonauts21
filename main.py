@@ -16,7 +16,7 @@ from torch.optim.lr_scheduler import MultiStepLR, StepLR
 
 from bit import load_bit
 from bit_neck import BitNeck
-from callbacks import ReduceAuxLossWeight
+from callbacks import ReduceAuxLossWeight, HalfScoreFinetuning
 
 from bdcn import load_bdcn
 from bdcn_neck import BDCNNeck
@@ -32,21 +32,7 @@ from clearml import Task, Logger
 
 from vggish_neck import VggishNeck
 
-PROJECT_NAME = 'ensemble mkii full_track'
-
-if __name__ == '__main__':
-    task = Task.init(
-        project_name=PROJECT_NAME,
-        task_name='task template',
-        tags=None,
-        reuse_last_task_id=False,
-        continue_last_task=False,
-        output_uri=None,
-        auto_connect_arg_parser=True,
-        auto_connect_frameworks=True,
-        auto_resource_monitoring=True,
-        auto_connect_streams=True,
-    )
+PROJECT_NAME = 'kROI explore'
 
 class DataAugmentation(nn.Module):
     """Module to perform data augmentation using Kornia on torch tensors."""
@@ -420,6 +406,8 @@ class LitModel(LightningModule):
                                              self.hparams.rois.split(',')).items():
                 self.log(f'val_corr/{roi}_final', corr, logger=True, sync_dist=False)
                 avg_val_corr.append(corr)
+                if roi == 'WB': # dirty finetune callback
+                    self.current_val_score = corr
 
         avg_val_corr = np.mean(avg_val_corr)
         self.log(f'val_corr/final', avg_val_corr, prog_bar=True, logger=True, sync_dist=False)
@@ -502,8 +490,15 @@ def train(args, voxel_idxs=None, level: str = ''):
     callbacks.append(early_stop_callback)
 
     if args.backbone_freeze_epochs > 0:
+        assert args.backbone_freeze_score == 0
         finetune_callback = BackboneFinetuning(
             args.backbone_freeze_epochs if not args.debug else 1
+        )
+        callbacks.append(finetune_callback)
+    if args.backbone_freeze_score > 0:
+        assert args.backbone_freeze_epochs == 0
+        finetune_callback = HalfScoreFinetuning(
+            args.backbone_freeze_score
         )
         callbacks.append(finetune_callback)
 
@@ -608,29 +603,29 @@ def train(args, voxel_idxs=None, level: str = ''):
                     # print(pred.shape)
                     torch.save(pred, os.path.join(prediction_dir, f'{rroi}.pt'))
             else:
-                if voxel_idxs is None:
-                    torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
-                else:  # for WB sub divide
-                    if not args.debug:
-                        torch.save(prediction, os.path.join(prediction_dir, f'{roi}_{level}.pt'))
-                    torch.save(voxel_idxs, os.path.join(prediction_dir, f'{roi}_voxel_idxs_{level}.pt'))
-
-                    dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
-                                             num_frames=args.video_frames, resolution=args.video_size, track=args.track,
-                                             cached=args.cached, val_ratio=args.val_ratio,
-                                             random_split=args.val_random_split,
-                                             use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold,
-                                             additional_features_dir=args.additional_features_dir,
-                                             additional_features=args.additional_features,
-                                             preprocessing_type=args.preprocessing_type,
-                                             load_from_np=args.load_from_np,
-                                             voxel_idxs=voxel_idxs)
-                    dm.setup('fit')
-                    assert args.fold == -1 and args.val_ratio == 0.1
-                    outs = prediction[900:1000]
-                    ys = torch.cat([data[1] for data in dm.val_dataloader()], 0)
-                    voxel_corrs = vectorized_correlation(outs, ys).cpu()
-                    return voxel_corrs
+                # if voxel_idxs is None:
+                torch.save(prediction, os.path.join(prediction_dir, f'{roi}.pt'))
+                # else:  # for WB sub divide
+                #     if not args.debug:
+                #         torch.save(prediction, os.path.join(prediction_dir, f'{roi}_{level}.pt'))
+                #     torch.save(voxel_idxs, os.path.join(prediction_dir, f'{roi}_voxel_idxs_{level}.pt'))
+                #
+                #     dm = AlgonautsDataModule(batch_size=args.batch_size, datasets_dir=args.datasets_dir, rois=args.rois,
+                #                              num_frames=args.video_frames, resolution=args.video_size, track=args.track,
+                #                              cached=args.cached, val_ratio=args.val_ratio,
+                #                              random_split=args.val_random_split,
+                #                              use_cv=args.use_cv, num_split=int(1 / args.val_ratio), fold=args.fold,
+                #                              additional_features_dir=args.additional_features_dir,
+                #                              additional_features=args.additional_features,
+                #                              preprocessing_type=args.preprocessing_type,
+                #                              load_from_np=args.load_from_np,
+                #                              voxel_idxs=voxel_idxs)
+                #     dm.setup('fit')
+                #     assert args.fold == -1 and args.val_ratio == 0.1
+                #     outs = prediction[900:1000]
+                #     ys = torch.cat([data[1] for data in dm.val_dataloader()], 0)
+                #     voxel_corrs = vectorized_correlation(outs, ys).cpu()
+                #     return voxel_corrs
 
 
 def parse_args():
@@ -653,14 +648,18 @@ def parse_args():
     parser.add_argument('--additional_features', type=str, default='')
     parser.add_argument('--additional_features_dir', type=str, default='/data_smr/huze/projects/my_algonauts/features/')
     parser.add_argument('--track', type=str, default='mini_track')
-    parser.add_argument('--divide_voxels', default=False, action="store_true")
-    parser.add_argument('--exclude_mini', default=False, action="store_true")
+    # parser.add_argument('--divide_voxels', default=False, action="store_true")
+    # parser.add_argument('--exclude_mini', default=False, action="store_true")
+    parser.add_argument('--voxel_index_file', type=str, default=None)
     parser.add_argument('--divide_chunks', type=int, default=4)
     parser.add_argument('--backbone_type', type=str, default='i3d_rgb', help='i3d_rgb, bdcn_edge, i3d_flow, bit')
     parser.add_argument('--rois', type=str, default="EBA")
+    parser.add_argument('--kroi', type=str, default=None)
+    parser.add_argument('--voxel_index_dir', type=str, default='/home/huze/voxel_indexs/')
     parser.add_argument('--subs', type=str, default="all")
     parser.add_argument('--num_subs', type=int, default=10)
     parser.add_argument('--backbone_freeze_epochs', type=int, default=0)
+    parser.add_argument('--backbone_freeze_score', type=float, default=0.)
     parser.add_argument('--step_lr_epochs', type=int, nargs='+', default=[4, 12])
     parser.add_argument('--step_lr_ratio', type=float, default=1.0)
     parser.add_argument('--gpus', type=str, default='1')
@@ -683,6 +682,7 @@ def parse_args():
     parser.add_argument('--rm_checkpoints', default=False, action="store_true")
     parser.add_argument('--logs_dir', type=str, default='/data_smr/huze/projects/my_algonauts/')
     parser.add_argument('--i3d_rgb_dir', type=str, default='/home/huze/.cache/')
+    parser.add_argument('--tag', type=str, default='')
 
     parser = LitModel.add_model_specific_args(parser)
     args = parser.parse_args()
@@ -721,22 +721,44 @@ def train_and_divide_voxels(args):
             ii += 1
 
 
-def main():
-    args = parse_args()
+def main(args):
 
-    if args.divide_voxels:
-        train_and_divide_voxels(args)
+    # if args.divide_voxels:
+    #     train_and_divide_voxels(args)
+    # else:
+    #     if args.exclude_mini:
+    #         config_file = 'voxels.json'
+    #         with open(config_file, 'r') as f:
+    #             roi_idxs = json.load(f)
+    #         rest_idxs = roi_idxs['REST']
+    #         train(args, voxel_idxs=rest_idxs)
+    #     else:
+    #         train(args)
+
+    if args.voxel_index_file is not None:
+        voxel_indexs = torch.load(args.voxel_index_file)
+        train(args, voxel_idxs=voxel_indexs)
+    elif args.kroi is not None:
+        path = os.path.join(args.voxel_index_dir, args.kroi+'.pt')
+        voxel_indexs = torch.load(path)
+        train(args, voxel_idxs=voxel_indexs)
     else:
-        if args.exclude_mini:
-            config_file = 'voxels.json'
-            with open(config_file, 'r') as f:
-                roi_idxs = json.load(f)
-            rest_idxs = roi_idxs['REST']
-            train(args, voxel_idxs=rest_idxs)
-        else:
-            train(args)
+        train(args)
 
 
 if __name__ == '__main__':
-
-    main()
+    task = Task.init(
+        project_name=PROJECT_NAME,
+        task_name='task template',
+        tags=None,
+        reuse_last_task_id=False,
+        continue_last_task=False,
+        output_uri=None,
+        auto_connect_arg_parser=True,
+        auto_connect_frameworks=True,
+        auto_resource_monitoring=True,
+        auto_connect_streams=True,
+    )
+    args = parse_args()
+    task.add_tags([args.tag])
+    main(args)

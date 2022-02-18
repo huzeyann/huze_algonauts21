@@ -283,7 +283,6 @@ def build_fc(p, input_dim, output_dim, part='full'):
 
     return nn.Sequential(*module_list)
 
-
 class FcFusion(nn.Module):
     def __init__(self, fusion_type='concat'):
         super(FcFusion, self).__init__()
@@ -591,10 +590,11 @@ class I3d_neck(nn.Module):
         x = out
         # x = {f'{pathway}_{x_i}': x[x_i] for x_i in self.pyramid_layers for pathway in self.pathways}
         x = {k: self.first_convs[k](v) for k, v in x.items()}
+        self.x_npooled = x
         if self.is_pyramid:
             x = self.pyramid_pathway(x, self.pyramid_layers, self.pathways)
         x = {k: self.poolings[k](v) for k, v in x.items()}
-
+        self.x_pooled = x
         # fmri
         x = {k: self.ch_response[k](v) for k, v in x.items()}
         # print(self.ch_response)

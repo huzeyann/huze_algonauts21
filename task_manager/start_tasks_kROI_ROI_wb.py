@@ -1,8 +1,10 @@
 import itertools
+import os.path
+import torch
 
 from clearml import Task
 
-PROJECT_NAME = 'ensemble mkii full_track'
+PROJECT_NAME = 'kROI explore'
 BASE_TASK = 'task template'
 
 task = Task.init(project_name=PROJECT_NAME,
@@ -13,8 +15,31 @@ task = Task.init(project_name=PROJECT_NAME,
 template_task = Task.get_task(project_name=PROJECT_NAME,
                               task_name=BASE_TASK)
 
+score_dict = {'MC2': 0.12,
+ 'SMC2': 0.006,
+ 'EBA': 0.18,
+ 'STS': 0.105,
+ 'V3': 0.15,
+ 'REST': 0.06,
+ 'V4': 0.12,
+ 'V2': 0.15,
+ 'V1': 0.15,
+ 'PPA': 0.105,
+ 'SC4': 0.105,
+ 'LC3': 0.105,
+ 'LC5': 0.18,
+ 'SMC1': 0.036,
+ 'LC4': 0.21,
+ 'LOC': 0.15,
+ 'FFA': 0.135,
+ 'LC1': 0.027,
+ 'SC3': 0.135,
+ 'WB': 0.06,
+ 'MC1': 0.006,
+ 'LC2': 0.15}
+
 available_devices = {
-    '16': [1]
+    '16': [0, 1]
 }
 
 queue_names = []
@@ -26,22 +51,25 @@ queues_buffer = itertools.cycle(queue_names)
 task_ids = []
 
 
-def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretrainings, batch_size=32):
-    for roi in rois:
-        for p in ps:
-            for layer in layers:
-                for freeze_bn in freeze_bns:
-                    for pooling_mode in pooling_modes:
-                        for pathway in pathways:
-                            for pretraining in pretrainings:
+def start_tasks_spp(krois, layers, ps, freeze_bns, pooling_modes,
+                    pathways, pretrainings,
+                    batch_size=32):
+    for p in ps:
+        for layer in layers:
+            for freeze_bn in freeze_bns:
+                for pooling_mode in pooling_modes:
+                    for pathway in pathways:
+                        for pretraining in pretrainings:
+                            for kroi in krois:
                                 assert pooling_mode in ['max', 'avg']
                                 queue = next(queues_buffer)
 
-                                p_text = '-'.join([str(i) for i in p])
-                                freeze_text = 'f_bn' if freeze_bn else 'nof_bn'
-                                pooling_text = f'spp_{p_text}_{pooling_mode}'
 
-                                tags = [roi, layer, pooling_text, freeze_text, pathway]
+
+                                p_text = '-'.join([str(i) for i in p])
+                                pooling_text = f'{p_text}'
+
+                                tags = [kroi, layer, pooling_text]
                                 cloned_task = Task.clone(source_task=template_task,
                                                          name=','.join(tags),
                                                          parent=template_task.id)
@@ -50,7 +78,8 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
 
                                 cloned_task_parameters = cloned_task.get_parameters()
                                 # cloned_task_parameters['rois'] = [roi]
-                                cloned_task_parameters['Args/rois'] = roi
+                                cloned_task_parameters['Args/rois'] = 'WB'
+                                cloned_task_parameters['Args/kroi'] = kroi
                                 cloned_task_parameters['Args/track'] = 'full_track'
                                 cloned_task_parameters['Args/video_size'] = 288
                                 cloned_task_parameters['Args/crop_size'] = 0
@@ -61,9 +90,10 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                 cloned_task_parameters['Args/learning_rate'] = 3e-4  # 1e-4
                                 cloned_task_parameters['Args/step_lr_epochs'] = [10]
                                 cloned_task_parameters['Args/step_lr_ratio'] = 1.0
-                                cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 4
-                                cloned_task_parameters['Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
-                                    batch_size / 4)
+                                cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 8
+                                cloned_task_parameters[
+                                    'Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
+                                    batch_size / 8)
                                 cloned_task_parameters['Args/num_layers'] = 2
                                 cloned_task_parameters['Args/conv_size'] = 256
                                 cloned_task_parameters['Args/first_layer_hidden'] = 2048
@@ -73,11 +103,10 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                 cloned_task_parameters['Args/pretrained'] = pretraining
                                 cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                                 cloned_task_parameters['Args/old_mix'] = True
-                                cloned_task_parameters['Args/no_convtrans'] = True  # TODO False
-                                cloned_task_parameters['Args/early_stop_epochs'] = 10
-                                cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5 if pretraining else 1.0  # 0.5
-                                cloned_task_parameters[
-                                    'Args/backbone_freeze_epochs'] = 8 if pretraining else 0  # TODO 10
+                                cloned_task_parameters['Args/no_convtrans'] = True
+                                cloned_task_parameters['Args/early_stop_epochs'] = 6
+                                cloned_task_parameters['Args/backbone_lr_ratio'] = 0.1
+                                cloned_task_parameters['Args/backbone_freeze_score'] = score_dict[kroi]
                                 cloned_task_parameters['Args/max_epochs'] = 100
                                 cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
                                 cloned_task_parameters['Args/pooling_mode'] = pooling_mode
@@ -85,7 +114,7 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                     cloned_task_parameters[f'Args/{l}_pooling_mode'] = 'spp'
                                     cloned_task_parameters[f'Args/spp_size_{l}'] = p
                                     cloned_task_parameters[f'Args/spp_size_t_{l}'] = [1 for _ in p]
-                                cloned_task_parameters['Args/backbone_type'] = 'i3d_rgb'
+                                cloned_task_parameters[f'Args/pooling_size'] = p # quick save for 1 layer model
                                 cloned_task_parameters['Args/final_fusion'] = 'concat'
                                 cloned_task_parameters['Args/pyramid_layers'] = layer
                                 cloned_task_parameters['Args/pathways'] = pathway
@@ -107,23 +136,25 @@ def start_tasks_spp(rois, layers, ps, freeze_bns, pooling_modes, pathways, pretr
                                 task_ids.append(cloned_task.id)
 
 
-def start_tasks_spp_flow(rois, layers, ps, pts, freeze_bns, pooling_modes, pathways, pretrainings, batch_size=32):
-    for roi in rois:
-      for p in ps:
-          for layer in layers:
-            for pt in pts:
-                for freeze_bn in freeze_bns:
-                    for pooling_mode in pooling_modes:
-                        for pathway in pathways:
-                            for pretraining in pretrainings:
+def start_tasks_spp_flow(krois, layers, ps, freeze_bns, pooling_modes,
+                    pathways, pretrainings,
+                    batch_size=32):
+    for p in ps:
+        for layer in layers:
+            for freeze_bn in freeze_bns:
+                for pooling_mode in pooling_modes:
+                    for pathway in pathways:
+                        for pretraining in pretrainings:
+                            for kroi in krois:
                                 assert pooling_mode in ['max', 'avg']
                                 queue = next(queues_buffer)
 
-                                p_text = '-'.join([str(i) for i in p])
-                                freeze_text = 'f_bn' if freeze_bn else 'nof_bn'
-                                pooling_text = f'spp_{p_text}-{pt}_{pooling_mode}'
 
-                                tags = [roi, layer, pooling_text, freeze_text, pathway, 'flow']
+
+                                p_text = '-'.join([str(i) for i in p])
+                                pooling_text = f'{p_text}'
+
+                                tags = [kroi, layer, pooling_text]
                                 cloned_task = Task.clone(source_task=template_task,
                                                          name=','.join(tags),
                                                          parent=template_task.id)
@@ -132,7 +163,8 @@ def start_tasks_spp_flow(rois, layers, ps, pts, freeze_bns, pooling_modes, pathw
 
                                 cloned_task_parameters = cloned_task.get_parameters()
                                 # cloned_task_parameters['rois'] = [roi]
-                                cloned_task_parameters['Args/rois'] = roi
+                                cloned_task_parameters['Args/rois'] = 'WB'
+                                cloned_task_parameters['Args/kroi'] = kroi
                                 cloned_task_parameters['Args/track'] = 'full_track'
                                 cloned_task_parameters['Args/video_size'] = 256
                                 cloned_task_parameters['Args/crop_size'] = 224
@@ -144,7 +176,8 @@ def start_tasks_spp_flow(rois, layers, ps, pts, freeze_bns, pooling_modes, pathw
                                 cloned_task_parameters['Args/step_lr_epochs'] = [10]
                                 cloned_task_parameters['Args/step_lr_ratio'] = 1.0
                                 cloned_task_parameters['Args/batch_size'] = batch_size if not freeze_bn else 4
-                                cloned_task_parameters['Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
+                                cloned_task_parameters[
+                                    'Args/accumulate_grad_batches'] = 1 if not freeze_bn else int(
                                     batch_size / 4)
                                 cloned_task_parameters['Args/num_layers'] = 2
                                 cloned_task_parameters['Args/conv_size'] = 256
@@ -155,18 +188,18 @@ def start_tasks_spp_flow(rois, layers, ps, pts, freeze_bns, pooling_modes, pathw
                                 cloned_task_parameters['Args/pretrained'] = pretraining
                                 cloned_task_parameters['Args/freeze_bn'] = freeze_bn
                                 cloned_task_parameters['Args/old_mix'] = True
-                                cloned_task_parameters['Args/no_convtrans'] = True  # TODO False
-                                cloned_task_parameters['Args/early_stop_epochs'] = 10
-                                cloned_task_parameters['Args/backbone_lr_ratio'] = 0.5 if pretraining else 1.0  # 0.5
-                                cloned_task_parameters[
-                                    'Args/backbone_freeze_epochs'] = 8 if pretraining else 0  # TODO 8
+                                cloned_task_parameters['Args/no_convtrans'] = True
+                                cloned_task_parameters['Args/early_stop_epochs'] = 6
+                                cloned_task_parameters['Args/backbone_lr_ratio'] = 0.1
+                                cloned_task_parameters['Args/backbone_freeze_score'] = score_dict[kroi] * 0.81
                                 cloned_task_parameters['Args/max_epochs'] = 100
                                 cloned_task_parameters['Args/gpus'] = queue.split('-')[1]
                                 cloned_task_parameters['Args/pooling_mode'] = pooling_mode
                                 for l in layer.split(','):
                                     cloned_task_parameters[f'Args/{l}_pooling_mode'] = 'spp'
                                     cloned_task_parameters[f'Args/spp_size_{l}'] = p
-                                    cloned_task_parameters[f'Args/spp_size_t_{l}'] = [pt for _ in p]
+                                    cloned_task_parameters[f'Args/spp_size_t_{l}'] = [1 for _ in p]
+                                cloned_task_parameters[f'Args/pooling_size'] = p # quick save for 1 layer model
                                 cloned_task_parameters['Args/final_fusion'] = 'concat'
                                 cloned_task_parameters['Args/pyramid_layers'] = layer
                                 cloned_task_parameters['Args/pathways'] = pathway
@@ -188,55 +221,9 @@ def start_tasks_spp_flow(rois, layers, ps, pts, freeze_bns, pooling_modes, pathw
                                 task_ids.append(cloned_task.id)
 
 
-# start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x1,x2,x3,x4', 'x2,x3,x4'],
-#     ps=[
-#         [1, 3, 5],
-#         [1, 5, 9],
-#         [3, 5, 7],
-#         [2, 4, 6],
-#         [4, 6, 9]
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     pathways=['none', 'topdown'],
-#     batch_size=24
-# )
-
 
 # start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x2,x3,x4'],
-#     ps=[
-#         [1, 2, 3],
-#         [1, 3, 5],
-#         [1, 5, 9],
-#         [3, 5, 7],
-#         [2, 4, 6],
-#         [4, 6, 9]
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     pathways=['none', 'topdown'],
-#     batch_size=24
-# )
-
-# start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x1,x2,x3,x4'],
-#     ps=[
-#         [3, 7, 11],
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     pathways=['none'],
-#     pretrainings=[True, False],
-#     batch_size=24,
-# )
-
-# start_tasks_spp(
-#     rois=['WB'],
+#     krois=score_dict.keys(),
 #     layers=['x1', 'x2', 'x3', 'x4'],
 #     ps=[
 #         [1],
@@ -252,97 +239,54 @@ def start_tasks_spp_flow(rois, layers, ps, pts, freeze_bns, pooling_modes, pathw
 #     freeze_bns=[True],
 #     pooling_modes=['avg'],
 #     pathways=['none'],
-#     batch_size=32,
 #     pretrainings=[True],
-# )
-
-# start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x3', 'x4'],
-#     ps=[
-#         [5],
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     pathways=['none'],
 #     batch_size=32,
-#     pretrainings=[True],
-# )
-
-# start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x3'],
-#     ps=[
-#         [5],
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     pathways=['none'],
-#     batch_size=32,
-#     pretrainings=[True],
 # )
 #
 # start_tasks_spp(
-#     rois=['WB'],
+#     krois=score_dict.keys(),
 #     layers=['x1', 'x2', 'x3', 'x4'],
 #     ps=[
+#         [1],
+#         [2],
+#         [3],
+#         [4],
+#         [5],
 #         [6],
 #         [7],
-#         [8],
-#         [9],
 #     ],
 #     freeze_bns=[True],
 #     pooling_modes=['avg'],
 #     pathways=['none'],
-#     batch_size=32,
 #     pretrainings=[True],
+#     batch_size=32,
 # )
 
-
-# start_tasks_spp(
-#     rois=['WB'],
-#     layers=['x2', 'x3', 'x4'],
-#     ps=[
-#         [9],
-#     ],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     pathways=['none'],
-#     batch_size=32,
-#     pretrainings=[True],
-# )
-
-start_tasks_spp_flow(
-    rois=['WB'],
-    layers=['x1', 'x2', 'x3', 'x4'],
+start_tasks_spp(
+    krois=['SM2'],
+    layers=['x4'],
     ps=[
         [1],
-        [2],
-        [3],
-        [4],
-        [5],
-        [6],
-        [7],
     ],
-    pts=[1],
     freeze_bns=[True],
     pooling_modes=['avg'],
     pathways=['none'],
-    batch_size=32,
     pretrainings=[True],
+    batch_size=32,
 )
 
-# start_tasks_spp_flow(
-#     rois=['WB'],
-#     layers=['x3'],
-#     ps=[
-#         [7],
-#     ],
-#     pts=[1, 2, 3, 4],
-#     freeze_bns=[True],
-#     pooling_modes=['avg'],
-#     pathways=['none'],
-#     batch_size=32,
-#     pretrainings=[True],
-# )
+start_tasks_spp(
+    krois=['SM2'],
+    layers=['x4'],
+    ps=[
+        [1],
+    ],
+    freeze_bns=[True],
+    pooling_modes=['avg'],
+    pathways=['none'],
+    pretrainings=[True],
+    batch_size=32,
+)
+
+
 print(task_ids)
